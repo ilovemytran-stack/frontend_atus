@@ -65,7 +65,12 @@ class Layout {
       <a href="${i.href}" class="bottom-nav-item ${current === i.href ? 'active' : ''}">
         <span class="icon">${i.icon}</span>
         <span>${i.label}</span>
-      </a>`).join('');
+      </a>`).join('')
+      + (user ? `
+      <a href="#" class="bottom-nav-item" onclick="API.logout(); return false;">
+        <span class="icon">🚪</span>
+        <span>Đăng xuất</span>
+      </a>` : '');
   }
 
   static renderToastContainer() {
