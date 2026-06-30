@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SocialShop</title>
+<link rel="stylesheet" href="css/global.css">
+<link rel="stylesheet" href="css/feed.css">
+<link rel="manifest" href="manifest.json">
+</head>
+<body>
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Main -->
+  <main class="main-content">
+    <!-- Mobile header -->
+    <header class="mobile-header">
+      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <div class="mobile-header-logo">SocialShop</div>
+      <button class="btn btn-ghost btn-icon" onclick="location.href='search.html'">🔍</button>
+    </header>
+
+    <!-- Feed tabs -->
+    <div class="feed-tabs">
+      <button class="feed-tab active" data-tab="following" onclick="switchTab('following')">Đang theo dõi</button>
+      <button class="feed-tab" data-tab="explore" onclick="switchTab('explore')">Đề xuất</button>
+    </div>
+
+    <!-- Create post bar -->
+    <div class="create-post-bar card" id="createBar" style="display:none">
+      <img src="" class="avatar avatar-md" id="myAvatar" alt="">
+      <button class="create-post-placeholder" onclick="openCreateModal()">Bạn đang nghĩ gì vậy?</button>
+      <div class="create-post-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openCreateModal('image')">🖼 Ảnh</button>
+        <button class="btn btn-ghost btn-sm" onclick="openCreateModal('video')">🎬 Video</button>
+      </div>
+    </div>
+
+    <!-- Feed -->
+    <div id="feed" class="feed"></div>
+    <div id="feedLoader" class="feed-loader">
+      <div class="skeleton" style="height:200px;border-radius:16px;margin:16px"></div>
+      <div class="skeleton" style="height:200px;border-radius:16px;margin:16px"></div>
+    </div>
+    <div id="feedEnd" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">Bạn đã xem hết rồi 🎉</div>
+  </main>
+
+  <!-- Right sidebar -->
+  <aside class="right-sidebar">
+    <div id="suggestedUsers"></div>
+  </aside>
+</div>
+
+<!-- Create Post Modal -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Tạo bài viết</div>
+      <button class="modal-close btn btn-ghost btn-icon" onclick="closeCreateModal()">✕</button>
+    </div>
+    <div class="modal-user">
+      <img src="" class="avatar avatar-md" id="modalAvatar" alt="">
+      <div>
+        <div id="modalUsername" style="font-weight:600"></div>
+        <select class="input" id="postPrivacy" style="padding:2px 8px;font-size:0.8rem;width:auto">
+          <option value="public">🌐 Công khai</option>
+          <option value="followers">👥 Người theo dõi</option>
+        </select>
+      </div>
+    </div>
+    <textarea class="input modal-textarea" id="postContent" placeholder="Bạn đang nghĩ gì vậy?" rows="4"></textarea>
+    <div id="imagePreviewContainer" class="image-preview-grid"></div>
+    <div class="modal-media-btns">
+      <label class="btn btn-ghost btn-sm" for="imageInput">🖼 Thêm ảnh</label>
+      <input type="file" id="imageInput" accept="image/*" multiple style="display:none" onchange="handleImageSelect(event)">
+      <label class="btn btn-ghost btn-sm" for="videoInput">🎬 Thêm video</label>
+      <input type="file" id="videoInput" accept="video/*" style="display:none" onchange="handleVideoSelect(event)">
+    </div>
+    <div id="videoPreviewContainer"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeCreateModal()">Hủy</button>
+      <button class="btn btn-primary" style="flex:2" id="postSubmitBtn" onclick="submitPost()">Đăng bài</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom nav -->
+<nav class="bottom-nav" id="bottom-nav"></nav>
+
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/feed.js"></script>
+</body>
+</html>
