@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng video – SocialShop</title>
+<link rel="stylesheet" href="/css/global.css">
+<style>
+body { background: #000; }
+.upload-app { height: 100dvh; display: flex; flex-direction: column; }
+.upload-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; color: #fff; }
+.upload-header-title { font-weight: 700; }
+.camera-stage { flex: 1; position: relative; background: #111; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.camera-stage video { width: 100%; height: 100%; object-fit: cover; }
+.camera-placeholder { color: var(--text-muted); text-align: center; padding: 24px; }
+.camera-controls { display: flex; align-items: center; justify-content: center; gap: 32px; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); background: #000; }
+.record-btn { width: 72px; height: 72px; border-radius: 50%; border: 4px solid #fff; background: transparent; display: flex; align-items: center; justify-content: center; }
+.record-btn-inner { width: 56px; height: 56px; border-radius: 50%; background: #FC5C5C; transition: var(--transition); }
+.record-btn.recording .record-btn-inner { border-radius: 10px; width: 28px; height: 28px; }
+.gallery-btn, .flip-btn { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; }
+.upload-form { padding: 16px; display: flex; flex-direction: column; gap: 14px; background: var(--bg-base); flex: 1; overflow-y: auto; }
+.preview-video { width: 100%; max-height: 50vh; border-radius: var(--radius-md); background: #000; object-fit: contain; }
+.timer-badge { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); color: #fff; padding: 4px 12px; border-radius: var(--radius-full); font-weight: 700; font-size: 0.85rem; display: none; }
+.timer-badge.show { display: block; }
+</style>
+</head>
+<body>
+<div class="upload-app" id="cameraStep">
+  <div class="upload-header">
+    <button class="btn btn-ghost btn-icon" style="color:#fff" onclick="history.back()">✕</button>
+    <div class="upload-header-title">Tạo video</div>
+    <div style="width:40px"></div>
+  </div>
+  <div class="camera-stage" id="cameraStage">
+    <div class="camera-placeholder" id="cameraPlaceholder">
+      <div style="font-size:48px;margin-bottom:12px">📷</div>
+      <p>Nhấn nút bên dưới để bật camera</p>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="startCamera()">Bật camera</button>
+    </div>
+    <video id="cameraPreview" autoplay playsinline muted style="display:none"></video>
+    <div class="timer-badge" id="timerBadge">00:00</div>
+  </div>
+  <div class="camera-controls">
+    <label class="gallery-btn" for="galleryInput">🖼<input type="file" id="galleryInput" accept="video/*" style="display:none" onchange="handleGalleryVideo(event)"></label>
+    <button class="record-btn" id="recordBtn" onclick="toggleRecording()" style="display:none">
+      <div class="record-btn-inner"></div>
+    </button>
+    <button class="flip-btn" onclick="flipCamera()" style="display:none" id="flipBtn">🔄</button>
+  </div>
+</div>
+
+<div class="upload-app" id="detailsStep" style="display:none">
+  <div class="upload-header">
+    <button class="btn btn-ghost btn-icon" onclick="backToCamera()">←</button>
+    <div class="upload-header-title">Hoàn tất</div>
+    <div style="width:40px"></div>
+  </div>
+  <div class="upload-form">
+    <video class="preview-video" id="previewVideo" controls></video>
+    <div class="input-group">
+      <label class="input-label">Tiêu đề</label>
+      <input class="input" id="videoTitle" placeholder="Thêm tiêu đề hấp dẫn...">
+    </div>
+    <div class="input-group">
+      <label class="input-label">Mô tả</label>
+      <textarea class="input" id="videoDesc" rows="3" placeholder="Mô tả video, thêm #hashtag..." style="resize:vertical"></textarea>
+    </div>
+    <div class="input-group">
+      <label class="input-label">Âm nhạc (tùy chọn)</label>
+      <input class="input" id="musicName" placeholder="Tên bài hát">
+    </div>
+    <button class="btn btn-primary btn-lg" id="uploadBtn" onclick="uploadVideo()">Đăng video</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
+<script>
+if (!API.requireAuth()) {}
+
+let mediaStream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordedBlob = null;
+let isRecording = false;
+let timerInterval = null;
+let seconds = 0;
+let facingMode = 'user';
+
+async function startCamera() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: true });
+    const video = document.getElementById('cameraPreview');
+    video.srcObject = mediaStream;
+    video.style.display = 'block';
+    document.getElementById('cameraPlaceholder').style.display = 'none';
+    document.getElementById('recordBtn').style.display = 'flex';
+    document.getElementById('flipBtn').style.display = 'flex';
+  } catch (err) {
+    Toast.error('Không thể truy cập camera. Vui lòng cấp quyền hoặc chọn video từ thư viện.');
+  }
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  mediaStream?.getTracks().forEach(t => t.stop());
+  await startCamera();
+}
+
+function toggleRecording() {
+  if (!isRecording) startRecording(); else stopRecording();
+}
+
+function startRecording() {
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm;codecs=vp9' });
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+    showDetailsStep(recordedBlob);
+  };
+  mediaRecorder.start();
+  isRecording = true;
+  document.getElementById('recordBtn').classList.add('recording');
+  seconds = 0;
+  document.getElementById('timerBadge').classList.add('show');
+  timerInterval = setInterval(() => {
+    seconds++;
+    const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+    const s = String(seconds % 60).padStart(2, '0');
+    document.getElementById('timerBadge').textContent = `${m}:${s}`;
+    if (seconds >= 60) stopRecording(); // max 60s
+  }, 1000);
+}
+
+function stopRecording() {
+  mediaRecorder?.stop();
+  isRecording = false;
+  clearInterval(timerInterval);
+  document.getElementById('recordBtn').classList.remove('recording');
+  document.getElementById('timerBadge').classList.remove('show');
+  mediaStream?.getTracks().forEach(t => t.stop());
+}
+
+function handleGalleryVideo(e) {
+  const file = e.target.files[0];
+  if (file) showDetailsStep(file);
+}
+
+function showDetailsStep(blob) {
+  recordedBlob = blob;
+  document.getElementById('cameraStep').style.display = 'none';
+  document.getElementById('detailsStep').style.display = 'flex';
+  document.getElementById('previewVideo').src = URL.createObjectURL(blob);
+}
+
+function backToCamera() {
+  document.getElementById('detailsStep').style.display = 'none';
+  document.getElementById('cameraStep').style.display = 'flex';
+}
+
+async function uploadVideo() {
+  if (!recordedBlob) return Toast.error('Vui lòng quay hoặc chọn video');
+  const btn = document.getElementById('uploadBtn');
+  loadingBtn(btn, true);
+
+  const form = new FormData();
+  const ext = recordedBlob.type.includes('webm') ? 'webm' : 'mp4';
+  form.append('video', recordedBlob, `video.${ext}`);
+  form.append('title', document.getElementById('videoTitle').value.trim());
+  form.append('description', document.getElementById('videoDesc').value.trim());
+  const music = document.getElementById('musicName').value.trim();
+  if (music) form.append('musicName', music);
+
+  const res = await API.post('/videos', form, true);
+  loadingBtn(btn, false);
+
+  if (res?.success) {
+    Toast.success('Đăng video thành công! 🎉');
+    setTimeout(() => location.href = 'videos.html', 800);
+  } else {
+    Toast.error(res?.message || 'Đăng video thất bại');
+  }
+}
+
+window.addEventListener('beforeunload', () => mediaStream?.getTracks().forEach(t => t.stop()));
+</script>
+</body>
+</html>

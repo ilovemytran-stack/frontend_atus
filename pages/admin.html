@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard – SocialShop</title>
+<link rel="stylesheet" href="/css/global.css">
+<style>
+.admin-layout { padding: 20px; max-width: 1100px; margin: 0 auto; }
+.admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; }
+.stat-card .num { font-size: 1.8rem; font-weight: 800; color: var(--brand); }
+.stat-card .label { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
+.admin-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+.admin-table th { text-align: left; padding: 12px 16px; background: var(--bg-elevated); font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+.admin-table td { padding: 12px 16px; border-top: 1px solid var(--border); font-size: 0.88rem; }
+.admin-section { margin-bottom: 32px; }
+.admin-section-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 14px; }
+.access-denied { text-align: center; padding: 80px 20px; }
+</style>
+</head>
+<body>
+<div class="admin-layout" id="adminContent" style="display:none">
+  <div class="admin-header">
+    <h1 style="font-size:1.5rem;font-weight:800">⚙️ Admin Dashboard</h1>
+    <a href="index.html" class="btn btn-secondary">← Về trang chủ</a>
+  </div>
+  <div class="admin-stats" id="adminStats"></div>
+  <div class="admin-section">
+    <div class="admin-section-title">👥 Người dùng gần đây</div>
+    <table class="admin-table" id="usersTable"><thead><tr><th>Username</th><th>Email</th><th>Bài viết</th><th>Theo dõi</th><th>Ngày tham gia</th></tr></thead><tbody id="usersTbody"></tbody></table>
+  </div>
+</div>
+<div id="accessDenied" class="access-denied" style="display:none">
+  <div style="font-size:48px;margin-bottom:16px">🚫</div>
+  <h2>Không có quyền truy cập</h2>
+  <p style="color:var(--text-muted);margin-top:8px">Trang này chỉ dành cho quản trị viên.</p>
+  <a href="index.html" class="btn btn-primary" style="margin-top:20px;display:inline-flex">Về trang chủ</a>
+</div>
+<script src="/js/api.js"></script>
+<script>
+(async () => {
+  const user = API.getCurrentUser();
+  if (!user || user.role !== 'admin') {
+    document.getElementById('accessDenied').style.display = 'block';
+    return;
+  }
+  document.getElementById('adminContent').style.display = 'block';
+  const statsRes = await API.get('/admin/stats');
+  const stats = statsRes?.stats || {};
+  document.getElementById('adminStats').innerHTML = `
+    <div class="stat-card"><div class="num">${formatNum(stats.totalUsers||0)}</div><div class="label">Tổng người dùng</div></div>
+    <div class="stat-card"><div class="num">${formatNum(stats.totalPosts||0)}</div><div class="label">Tổng bài viết</div></div>
+    <div class="stat-card"><div class="num">${formatNum(stats.totalVideos||0)}</div><div class="label">Tổng video</div></div>
+    <div class="stat-card"><div class="num">🟢 Online</div><div class="label">Trạng thái server</div></div>`;
+
+  const usersRes = await API.get('/admin/users?limit=20');
+  if (usersRes?.success) {
+    document.getElementById('usersTbody').innerHTML = usersRes.users.map(u => `
+      <tr><td>${u.username}</td><td>${u.email}</td><td>${u.postsCount}</td><td>${u.followersCount}</td><td>${new Date(u.createdAt).toLocaleDateString('vi-VN')}</td></tr>`).join('');
+  }
+})();
+</script>
+</body>
+</html>
