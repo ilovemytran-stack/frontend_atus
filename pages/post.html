@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bài viết – SocialShop</title>
+<link rel="stylesheet" href="css/global.css">
+<link rel="stylesheet" href="css/feed.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <main class="main-content">
+    <header class="mobile-header">
+      <button class="btn btn-ghost btn-icon" onclick="history.back()">←</button>
+      <div class="mobile-header-logo">Bài viết</div>
+      <div style="width:40px"></div>
+    </header>
+    <div class="feed" id="postContainer" style="padding-top:16px"></div>
+  </main>
+  <aside class="right-sidebar"><div id="suggestedUsers"></div></aside>
+</div>
+<nav class="bottom-nav" id="bottom-nav"></nav>
+<div id="toast-container"></div>
+<script src="js/api.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/feed.js"></script>
+<script>
+const postId = new URLSearchParams(location.search).get('id');
+document.addEventListener('DOMContentLoaded', async () => {
+  Layout.init();
+  loadSuggestedUsers();
+  if (!postId) return;
+  const res = await API.get(`/posts/${postId}`);
+  if (res?.success) {
+    document.getElementById('feed').remove?.();
+    const original = document.getElementById('feed');
+  }
+  if (res?.success) renderSinglePost(res.post);
+  else document.getElementById('postContainer').innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:40px">Bài viết không tồn tại</p>';
+});
+
+function renderSinglePost(post) {
+  // Reuse renderPost logic by temporarily pointing #feed to our container
+  const fakeFeed = document.getElementById('postContainer');
+  fakeFeed.id = 'feed';
+  renderPost(post);
+  // show full comments instead of last 3
+  const commentsEl = document.getElementById(`comments-${post._id}`);
+  if (commentsEl) {
+    commentsEl.style.display = 'block';
+    document.getElementById(`comment-list-${post._id}`).innerHTML = (post.comments || []).map(renderComment).join('');
+  }
+}
+</script>
+</body>
+</html>
