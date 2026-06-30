@@ -15,8 +15,7 @@ class Layout {
     const current = location.pathname.split('/').pop();
     const navItems = [
       { href: 'index.html', icon: '🏠', label: 'Trang chủ' },
-      { href: 'explore.html', icon: '🧭', label: 'Khám phá' },
-      { href: 'search.html', icon: '🔍', label: 'Tìm kiếm' },
+      { href: 'explore.html', icon: '🔍', label: 'Khám phá' },
       { href: 'videos.html', icon: '🎬', label: 'Video' },
       { href: 'messages.html', icon: '💬', label: 'Tin nhắn', badge: 'msg' },
       { href: 'notifications.html', icon: '🔔', label: 'Thông báo', badge: 'notif' },
@@ -57,8 +56,7 @@ class Layout {
     const current = location.pathname.split('/').pop();
     const items = [
       { href: 'index.html', icon: '🏠', label: 'Home' },
-      { href: 'explore.html', icon: '🧭', label: 'Explore' },
-      { href: 'search.html', icon: '🔍', label: 'Search' },
+      { href: 'explore.html', icon: '🔍', label: 'Explore' },
       { href: 'videos.html', icon: '🎬', label: 'Video' },
       { href: 'notifications.html', icon: '🔔', label: 'Thông báo' },
       { href: user ? `profile.html?u=${user.username}` : 'login.html', icon: user?.avatar ? `<img src="${user.avatar}" class="avatar avatar-xs" alt="">` : '👤', label: 'Cá nhân' },
@@ -67,12 +65,7 @@ class Layout {
       <a href="${i.href}" class="bottom-nav-item ${current === i.href ? 'active' : ''}">
         <span class="icon">${i.icon}</span>
         <span>${i.label}</span>
-      </a>`).join('')
-      + (user ? `
-      <a href="#" class="bottom-nav-item" onclick="API.logout(); return false;">
-        <span class="icon">🚪</span>
-        <span>Đăng xuất</span>
-      </a>` : '');
+      </a>`).join('');
   }
 
   static renderToastContainer() {
