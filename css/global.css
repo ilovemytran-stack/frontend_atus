@@ -133,7 +133,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* Layout */
 .app-layout { display: flex; min-height: 100dvh; }
-.sidebar { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100dvh; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 100; transition: transform var(--transition); }
+.sidebar { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100dvh; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 200; transition: transform var(--transition); }
+.sidebar-overlay.active { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; }
 .main-content { flex: 1; margin-left: var(--sidebar-w); min-height: 100dvh; }
 .right-sidebar { position: fixed; top: 0; right: 0; width: 280px; height: 100dvh; padding: 24px 16px; overflow-y: auto; }
 
