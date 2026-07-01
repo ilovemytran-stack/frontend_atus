@@ -9,17 +9,34 @@ const Icon = (() => {
     bell: wrap('<path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
     user: wrap('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
     logout: wrap('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'),
+    admin: wrap('<path d="M12 2l8 4v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/>'),
   };
 })();
 
 
 class Layout {
-  static init() {
+  static async init() {
     this.renderSidebar();
     this.renderBottomNav();
     this.renderToastContainer();
     this.setupMobileMenu();
     this.loadNotifCount();
+    // Đồng bộ lại role/thông tin user mới nhất từ server (phòng khi bị đổi role
+    // trực tiếp trong DB, hoặc bị khóa tài khoản) rồi render lại nếu có thay đổi.
+    if (API.isLoggedIn()) {
+      const before = JSON.stringify(API.getCurrentUser());
+      const { user: fresh, banned, message } = await API.refreshUser();
+      if (banned) {
+        Toast.error(message || 'Tài khoản của bạn đã bị khóa.');
+        API.removeToken();
+        setTimeout(() => window.location.href = 'login.html', 1200);
+        return;
+      }
+      if (JSON.stringify(fresh) !== before) {
+        this.renderSidebar();
+        this.renderBottomNav();
+      }
+    }
   }
 
   static renderSidebar() {
@@ -35,6 +52,9 @@ class Layout {
       { href: 'notifications.html', icon: Icon.bell, label: 'Thông báo', badge: 'notif' },
       { href: user ? `profile.html?u=${user.username}` : 'login.html', icon: Icon.user, label: 'Trang cá nhân' },
     ];
+    if (user?.role === 'admin') {
+      navItems.push({ href: 'admin.html', icon: Icon.admin, label: 'Quản trị' });
+    }
     sidebar.innerHTML = `
       <div class="sidebar-logo">
         <div class="sidebar-logo-icon">🌐</div>

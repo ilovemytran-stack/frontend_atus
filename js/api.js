@@ -59,6 +59,23 @@ class API {
     localStorage.setItem('ss_user', JSON.stringify(user));
   }
 
+  // Lấy lại thông tin user mới nhất từ server (role, isBanned, ...) và cập nhật cache.
+  // Cần gọi cái này thay vì chỉ tin localStorage, vì nếu đổi role trực tiếp trong DB
+  // thì localStorage vẫn giữ dữ liệu cũ cho tới khi được refresh.
+  // Trả về { user, banned, message }.
+  static async refreshUser() {
+    if (!this.isLoggedIn()) return { user: null, banned: false };
+    const res = await this.get('/auth/me');
+    if (res?.success && res.user) {
+      this.saveUser(res.user);
+      return { user: res.user, banned: false };
+    }
+    if (res && res.success === false && /khóa/i.test(res.message || '')) {
+      return { user: null, banned: true, message: res.message };
+    }
+    return { user: this.getCurrentUser(), banned: false };
+  }
+
   static isLoggedIn() { return !!this.getToken(); }
 
   static requireAuth() {
