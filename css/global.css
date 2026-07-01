@@ -15,6 +15,7 @@
   --accent-pink: #FC5C9C;
   --accent-cyan: #5CF0FC;
   --accent-green: #5CFC9A;
+  --danger: #FC5C5C;
   
   --text-primary: #F0F0FF;
   --text-secondary: #8888A8;
@@ -144,8 +145,17 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .bottom-nav-item.active { color: var(--brand); }
 .bottom-nav-item .icon { font-size: 22px; }
 
-/* Animations */
-@keyframes spin { to { transform: rotate(360deg); } }
+.icon-svg { display: block; }
+.sidebar-icon, .bottom-nav-item .icon, .btn-icon { display: inline-flex; align-items: center; justify-content: center; }
+.sidebar-icon svg, .bottom-nav-item .icon svg { transition: var(--transition); }
+.sidebar-item.active .icon-svg, .bottom-nav-item.active .icon-svg { color: var(--brand); }
+
+/* Page + interaction polish */
+body { animation: fadeIn 0.25s ease; }
+.btn { transition: var(--transition), transform 0.1s ease; }
+.btn:active { transform: scale(0.97); }
+.sidebar-item, .bottom-nav-item { transition: var(--transition), color 0.15s ease; }
+
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }

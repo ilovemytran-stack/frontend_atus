@@ -16,6 +16,8 @@
 .sidebar-actions { padding: 8px 16px; }
 .sidebar-post-btn { width: 100%; }
 .sidebar-user { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--border); margin-top: auto; }
+.sidebar-user .btn-icon { color: var(--text-muted); transition: var(--transition); }
+.sidebar-user .btn-icon:hover { background: rgba(252,92,92,0.15); color: var(--danger); }
 .sidebar-user-info { flex: 1; min-width: 0; }
 .sidebar-user-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-user-handle { font-size: 0.78rem; color: var(--text-muted); }
@@ -89,3 +91,10 @@
 .suggested-user-name { font-weight: 600; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .suggested-user-meta { font-size: 0.75rem; color: var(--text-muted); }
 .feed-loader { padding: 16px; max-width: 640px; margin: 0 auto; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 60px 24px; max-width: 360px; margin: 0 auto; animation: fadeIn 0.3s ease; }
+.empty-state-icon { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.empty-state-icon svg { width: 26px; height: 26px; }
+.empty-state-title { font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
+.empty-state-text { font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
