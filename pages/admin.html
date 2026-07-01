@@ -21,6 +21,15 @@
 </style>
 </head>
 <body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <main class="main-content">
+    <header class="mobile-header">
+      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <div class="mobile-header-logo">Admin</div>
+      <div style="width:40px"></div>
+    </header>
 <div class="admin-layout" id="adminContent" style="display:none">
   <div class="admin-header">
     <h1 style="font-size:1.5rem;font-weight:800">⚙️ Admin Dashboard</h1>
@@ -38,9 +47,14 @@
   <p style="color:var(--text-muted);margin-top:8px">Trang này chỉ dành cho quản trị viên.</p>
   <a href="index.html" class="btn btn-primary" style="margin-top:20px;display:inline-flex">Về trang chủ</a>
 </div>
+  </main>
+</div>
+<div id="toast-container"></div>
 <script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
 <script>
 (async () => {
+  Layout.init();
   const user = API.getCurrentUser();
   if (!user || user.role !== 'admin') {
     document.getElementById('accessDenied').style.display = 'block';
