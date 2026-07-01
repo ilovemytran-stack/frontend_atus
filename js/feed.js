@@ -40,7 +40,23 @@ async function loadFeed(reset = true) {
   document.getElementById('feedLoader').style.display = 'none';
 
   if (res?.success) {
-    res.posts.forEach(p => renderPost(p));
+    const isFirstLoad = page === 1;
+    if (isFirstLoad && res.posts.length === 0) {
+      document.getElementById('feed').innerHTML = currentTab === 'following'
+        ? `<div class="empty-state">
+             <div class="empty-state-icon">${Icon.user}</div>
+             <div class="empty-state-title">Chưa có bài viết nào để hiện</div>
+             <div class="empty-state-text">Theo dõi thêm vài người để lấp đầy trang chủ, hoặc thử tab Đề xuất.</div>
+           </div>`
+        : `<div class="empty-state">
+             <div class="empty-state-icon">${Icon.search}</div>
+             <div class="empty-state-title">Chưa có bài viết đề xuất</div>
+             <div class="empty-state-text">Quay lại sau khi cộng đồng đăng thêm bài viết nhé.</div>
+           </div>`;
+      hasMore = false;
+      return;
+    }
+    res.posts.forEach((p, i) => renderPost(p, i));
     hasMore = res.hasMore;
     page++;
     if (!hasMore) document.getElementById('feedEnd').style.display = 'block';
@@ -54,11 +70,12 @@ function switchTab(tab) {
   loadFeed(true);
 }
 
-function renderPost(post) {
+function renderPost(post, index = 0) {
   const isLiked = user && post.likes?.includes(user._id);
   const card = document.createElement('div');
   card.className = 'post-card';
   card.id = `post-${post._id}`;
+  card.style.animationDelay = `${Math.min(index, 6) * 0.06}s`;
   card.innerHTML = `
     <div class="post-header">
       <a href="profile.html?u=${post.author.username}">
