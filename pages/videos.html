@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video – Public</title>
+<link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/video.css">
+</head>
+<body>
+<div class="video-app">
+  <!-- Sidebar (desktop) -->
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Video feed (TikTok-style) -->
+  <div class="video-feed" id="videoFeed"></div>
+
+  <!-- Mobile header -->
+  <div class="video-top-bar">
+    <div class="video-tabs">
+      <button class="video-tab active" data-tab="explore" onclick="switchVideoTab('explore', this)">Đề xuất</button>
+      <button class="video-tab" data-tab="following" onclick="switchVideoTab('following', this)">Đang theo dõi</button>
+    </div>
+    <button class="btn btn-ghost btn-icon video-upload-btn" onclick="location.href='upload-video.html'">+</button>
+  </div>
+</div>
+
+<!-- Bottom nav -->
+<nav class="bottom-nav" id="bottom-nav"></nav>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const user = API.getCurrentUser();
+let videos = [];
+let currentIdx = 0;
+let currentTab = 'explore';
+let page = 1;
+let loadingMore = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  Layout.init();
+  loadVideos();
+  // Register service worker
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+});
+
+async function loadVideos(reset = true) {
+  if (loadingMore) return;
+  loadingMore = true;
+  if (reset) { page = 1; videos = []; document.getElementById('videoFeed').innerHTML = ''; }
+
+  const endpoint = currentTab === 'following' && user
+    ? `/videos/following?page=${page}&limit=5`
+    : `/videos/explore?page=${page}&limit=5`;
+  const res = await API.get(endpoint);
+  loadingMore = false;
+
+  if (res?.success && res.videos.length) {
+    res.videos.forEach((v, i) => {
+      videos.push(v);
+      renderVideoCard(v, videos.length - 1);
+    });
+    page++;
+    setupObserver();
+  }
+}
+
+function renderVideoCard(video, idx) {
+  const isLiked = user && video.likes?.includes(user._id);
+  const card = document.createElement('div');
+  card.className = 'video-card';
+  card.dataset.idx = idx;
+  card.dataset.videoId = video._id;
+  card.innerHTML = `
+    <video class="video-player" id="vplayer-${video._id}" src="${video.url}" loop playsinline muted preload="metadata" poster="${video.thumbnail || ''}" onclick="togglePlay(this)"></video>
+    <button class="video-mute-btn" onclick="toggleMute(event, '${video._id}')">🔇</button>
+    <div class="video-overlay">
+      <div class="video-info">
+        <a href="profile.html?u=${video.author.username}" class="video-author">
+          <img src="${avatarURL(video.author)}" class="avatar avatar-sm" alt="">
+          <span>${video.author.displayName || video.author.username}</span>
+          ${video.author.isVerified ? '✅' : ''}
+        </a>
+        ${video.title ? `<div class="video-title">${escapeHTML(video.title)}</div>` : ''}
+        ${video.description ? `<div class="video-desc">${escapeHTML(video.description)}</div>` : ''}
+        ${video.music?.name ? `<div class="video-music">🎵 ${video.music.name}${video.music.artist ? ' - ' + video.music.artist : ''}</div>` : ''}
+      </div>
+      <div class="video-actions">
+        <button class="video-action ${isLiked ? 'liked' : ''}" id="vlike-${video._id}" onclick="likeVideo('${video._id}', this)">
+          <span class="video-action-icon">${isLiked ? '❤️' : '🤍'}</span>
+          <span>${formatNum(video.likesCount)}</span>
+        </button>
+        <button class="video-action" onclick="openVideoComments('${video._id}')">
+          <span class="video-action-icon">💬</span>
+          <span>${formatNum(video.commentsCount)}</span>
+        </button>
+        <button class="video-action" onclick="shareVideo('${video._id}')">
+          <span class="video-action-icon">🔗</span>
+          <span>${formatNum(video.sharesCount)}</span>
+        </button>
+        <div class="video-action">
+          <span class="video-action-icon">👁</span>
+          <span>${formatNum(video.viewsCount)}</span>
+        </div>
+        ${user?._id === video.author._id ? `<button class="video-action" onclick="deleteVideo('${video._id}')"><span class="video-action-icon">🗑</span></button>` : ''}
+      </div>
+    </div>
+    <div class="video-play-indicator" id="play-${video._id}">▶</div>`;
+  document.getElementById('videoFeed').appendChild(card);
+}
+
+let videosMuted = true; // Mặc định tắt tiếng để trình duyệt cho phép tự động phát
+
+function setupObserver() {
+  const cards = document.querySelectorAll('.video-card');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const vid = entry.target.querySelector('.video-player');
+      if (entry.isIntersecting) {
+        vid.muted = videosMuted;
+        vid.play().catch(() => {});
+        // Preload next
+        const nextCard = entry.target.nextElementSibling;
+        if (nextCard) nextCard.querySelector('.video-player')?.load();
+        // Load more when near end
+        const idx = parseInt(entry.target.dataset.idx);
+        if (idx >= videos.length - 2) loadVideos(false);
+      } else {
+        vid.pause();
+      }
+    });
+  }, { threshold: 0.6 });
+  cards.forEach(c => obs.observe(c));
+}
+
+function togglePlay(vid) {
+  vid.paused ? vid.play() : vid.pause();
+  const card = vid.closest('.video-card');
+  const indicator = card?.querySelector('.video-play-indicator');
+  if (indicator) { indicator.textContent = vid.paused ? '▶' : ''; indicator.style.opacity = vid.paused ? '1' : '0'; }
+}
+
+function toggleMute(e, videoId) {
+  e.stopPropagation();
+  videosMuted = !videosMuted;
+  document.querySelectorAll('.video-player').forEach(v => v.muted = videosMuted);
+  document.querySelectorAll('.video-mute-btn').forEach(b => b.textContent = videosMuted ? '🔇' : '🔊');
+}
+
+async function likeVideo(videoId, btn) {
+  if (!user) return (location.href = 'login.html');
+  const res = await API.post(`/videos/${videoId}/like`);
+  if (res?.success) {
+    btn.classList.toggle('liked', res.liked);
+    btn.querySelector('.video-action-icon').textContent = res.liked ? '❤️' : '🤍';
+    btn.querySelector('span:last-child').textContent = formatNum(res.likesCount);
+  }
+}
+
+async function deleteVideo(videoId) {
+  if (!confirm('Xóa video này?')) return;
+  const res = await API.delete(`/videos/${videoId}`);
+  if (res?.success) { document.querySelector(`[data-video-id="${videoId}"]`)?.remove(); Toast.success('Đã xóa video'); }
+}
+
+function shareVideo(videoId) {
+  const url = location.origin + '/video.html?id=' + videoId;
+  if (navigator.share) navigator.share({ url });
+  else { navigator.clipboard.writeText(url); Toast.success('Đã sao chép link'); }
+}
+
+// Comments bottom sheet
+async function openVideoComments(videoId) {
+  const res = await API.get(`/videos/${videoId}`);
+  if (!res?.success) return;
+  const sheet = document.createElement('div');
+  sheet.className = 'comment-sheet';
+  sheet.innerHTML = `
+    <div class="comment-sheet-handle"></div>
+    <div class="comment-sheet-header">
+      <span style="font-weight:700">${formatNum(res.video.commentsCount)} bình luận</span>
+      <button class="btn btn-ghost btn-icon" onclick="this.closest('.comment-sheet').remove()">✕</button>
+    </div>
+    <div class="comment-sheet-list" id="csl-${videoId}">
+      ${res.video.comments?.map(c => `
+        <div class="comment-item" style="padding:10px 0">
+          <img src="${avatarURL(c.user)}" class="avatar avatar-xs" alt="">
+          <div class="comment-bubble">
+            <div class="comment-author">${c.user?.displayName || c.user?.username}</div>
+            <div class="comment-text">${escapeHTML(c.text || '')}</div>
+            <div class="comment-time">${timeAgo(c.createdAt)}</div>
+          </div>
+        </div>`).join('') || '<p style="text-align:center;color:var(--text-muted);padding:20px">Chưa có bình luận</p>'}
+    </div>
+    ${user ? `<div class="comment-sheet-input">
+      <img src="${avatarURL(user)}" class="avatar avatar-xs" alt="">
+      <input class="comment-input" placeholder="Thêm bình luận..." onkeydown="if(event.key==='Enter')submitVideoComment('${videoId}',this)">
+    </div>` : ''}`;
+  document.body.appendChild(sheet);
+  requestAnimationFrame(() => sheet.classList.add('open'));
+  sheet.addEventListener('click', e => { if (e.target === sheet) { sheet.classList.remove('open'); setTimeout(() => sheet.remove(), 300); } });
+}
+
+async function submitVideoComment(videoId, input) {
+  const text = input.value.trim();
+  if (!text) return;
+  const res = await API.post(`/videos/${videoId}/comment`, { text });
+  if (res?.success) {
+    input.value = '';
+    const list = document.getElementById(`csl-${videoId}`);
+    list.insertAdjacentHTML('beforeend', `
+      <div class="comment-item" style="padding:10px 0">
+        <img src="${avatarURL(user)}" class="avatar avatar-xs" alt="">
+        <div class="comment-bubble">
+          <div class="comment-author">${user.displayName || user.username}</div>
+          <div class="comment-text">${escapeHTML(text)}</div>
+          <div class="comment-time">vừa xong</div>
+        </div>
+      </div>`);
+    list.scrollTop = list.scrollHeight;
+  }
+}
+
+function switchVideoTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.video-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  loadVideos(true);
+}
+
+function escapeHTML(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

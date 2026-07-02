@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard – Public</title>
+<link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/feed.css">
+<style>
+.admin-layout { padding: 20px; max-width: 1200px; margin: 0 auto; }
+.admin-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+.admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; }
+.stat-card .num { font-size: 1.6rem; font-weight: 800; color: var(--brand); }
+.stat-card .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+.admin-tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.admin-tab { padding: 10px 16px; font-weight: 600; font-size: 0.9rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
+.admin-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+.admin-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.admin-toolbar .input { max-width: 280px; }
+.admin-table-wrap { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
+.admin-table th { text-align: left; padding: 12px 16px; background: var(--bg-elevated); font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
+.admin-table td { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 0.86rem; vertical-align: middle; }
+.admin-table tr.is-banned { opacity: 0.55; }
+.admin-user-cell { display: flex; align-items: center; gap: 10px; }
+.admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.pagination { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+.access-denied { text-align: center; padding: 80px 20px; }
+.role-pill { padding: 2px 9px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; }
+.role-pill.admin { background: rgba(124,92,252,0.18); color: var(--brand); }
+.role-pill.user { background: var(--bg-elevated); color: var(--text-muted); }
+.ban-pill { padding: 2px 9px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; background: rgba(252,92,92,0.15); color: #FC5C5C; }
+.empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <main class="main-content">
+    <header class="mobile-header">
+      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <div class="mobile-header-logo">Admin</div>
+      <div style="width:40px"></div>
+    </header>
+<div class="admin-layout" id="adminContent" style="display:none">
+  <div class="admin-header">
+    <h1 style="font-size:1.5rem;font-weight:800">⚙️ Admin Dashboard</h1>
+    <a href="index.html" class="btn btn-secondary">← Về trang chủ</a>
+  </div>
+  <div class="admin-stats" id="adminStats"></div>
+
+  <div class="admin-tabs">
+    <div class="admin-tab active" data-tab="users">👥 Người dùng</div>
+    <div class="admin-tab" data-tab="posts">📝 Bài viết</div>
+    <div class="admin-tab" data-tab="videos">🎬 Video</div>
+  </div>
+
+  <div class="admin-toolbar">
+    <input type="text" class="input" id="searchInput" placeholder="Tìm kiếm...">
+    <button class="btn btn-secondary btn-sm" id="searchBtn">Tìm</button>
+  </div>
+
+  <div id="panel-users" class="admin-panel">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Người dùng</th><th>Email</th><th>Quyền</th><th>Trạng thái</th><th>Bài viết</th><th>Theo dõi</th><th>Ngày tham gia</th><th>Hành động</th></tr></thead>
+        <tbody id="usersTbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="usersPagination"></div>
+  </div>
+
+  <div id="panel-posts" class="admin-panel" style="display:none">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Tác giả</th><th>Nội dung</th><th>Lượt thích</th><th>Bình luận</th><th>Ngày đăng</th><th>Hành động</th></tr></thead>
+        <tbody id="postsTbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="postsPagination"></div>
+  </div>
+
+  <div id="panel-videos" class="admin-panel" style="display:none">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Tác giả</th><th>Tiêu đề</th><th>Lượt xem</th><th>Lượt thích</th><th>Ngày đăng</th><th>Hành động</th></tr></thead>
+        <tbody id="videosTbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="videosPagination"></div>
+  </div>
+</div>
+<div id="accessDenied" class="access-denied" style="display:none">
+  <div style="font-size:48px;margin-bottom:16px">🚫</div>
+  <h2>Không có quyền truy cập</h2>
+  <p style="color:var(--text-muted);margin-top:8px">Trang này chỉ dành cho quản trị viên. Nếu bạn vừa được cấp quyền admin, hãy đăng xuất rồi đăng nhập lại.</p>
+  <a href="index.html" class="btn btn-primary" style="margin-top:20px;display:inline-flex">Về trang chủ</a>
+</div>
+  </main>
+</div>
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const state = { tab: 'users', page: { users: 1, posts: 1, videos: 1 }, search: '' };
+
+function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function checkAccessAndInit() {
+  await Layout.init();
+  const user = API.getCurrentUser();
+  if (!user || user.role !== 'admin') {
+    document.getElementById('accessDenied').style.display = 'block';
+    return;
+  }
+  document.getElementById('adminContent').style.display = 'block';
+  await loadStats();
+  await loadUsers();
+
+  document.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
+      state.tab = tab.dataset.tab;
+      document.getElementById(`panel-${state.tab}`).style.display = 'block';
+      document.getElementById('searchInput').value = '';
+      state.search = '';
+      loadTab(state.tab);
+    });
+  });
+
+  document.getElementById('searchBtn').addEventListener('click', () => {
+    state.search = document.getElementById('searchInput').value.trim();
+    state.page[state.tab] = 1;
+    loadTab(state.tab);
+  });
+  document.getElementById('searchInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('searchBtn').click();
+  });
+}
+
+function loadTab(tab) {
+  if (tab === 'users') return loadUsers();
+  if (tab === 'posts') return loadPosts();
+  if (tab === 'videos') return loadVideos();
+}
+
+async function loadStats() {
+  const statsRes = await API.get('/admin/stats');
+  const stats = statsRes?.stats || {};
+  document.getElementById('adminStats').innerHTML = `
+    <div class="stat-card"><div class="num">${formatNum(stats.totalUsers||0)}</div><div class="label">Tổng người dùng</div></div>
+    <div class="stat-card"><div class="num">${formatNum(stats.totalPosts||0)}</div><div class="label">Tổng bài viết</div></div>
+    <div class="stat-card"><div class="num">${formatNum(stats.totalVideos||0)}</div><div class="label">Tổng video</div></div>
+    <div class="stat-card"><div class="num">${formatNum(stats.newUsersToday||0)}</div><div class="label">User mới hôm nay</div></div>
+    <div class="stat-card"><div class="num">${formatNum(stats.bannedUsers||0)}</div><div class="label">Đang bị khóa</div></div>
+    <div class="stat-card"><div class="num">${formatNum(stats.admins||0)}</div><div class="label">Số lượng admin</div></div>`;
+}
+
+function renderPagination(containerId, page, pages, onGo) {
+  const el = document.getElementById(containerId);
+  if (!pages || pages <= 1) { el.innerHTML = ''; return; }
+  let html = '';
+  for (let i = 1; i <= pages; i++) {
+    html += `<button class="btn btn-sm ${i === page ? 'btn-primary' : 'btn-secondary'}" data-page="${i}">${i}</button>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => onGo(+b.dataset.page)));
+}
+
+// ===== USERS =====
+async function loadUsers() {
+  const p = state.page.users;
+  const res = await API.get(`/admin/users?page=${p}&limit=15&search=${encodeURIComponent(state.search)}`);
+  if (!res?.success) return;
+  document.getElementById('usersTbody').innerHTML = res.users.length ? res.users.map(u => `
+    <tr class="${u.isBanned ? 'is-banned' : ''}">
+      <td><div class="admin-user-cell"><img src="${avatarURL(u)}" class="avatar avatar-xs" alt=""><div><div style="font-weight:600">${esc(u.displayName || u.username)}</div><div style="color:var(--text-muted);font-size:0.78rem">@${esc(u.username)}</div></div></div></td>
+      <td>${esc(u.email)}</td>
+      <td><span class="role-pill ${u.role}">${u.role === 'admin' ? 'Admin' : 'User'}</span></td>
+      <td>${u.isBanned ? `<span class="ban-pill" title="${esc(u.banReason||'')}">Bị khóa</span>` : '<span style="color:#3DDC84">Hoạt động</span>'}</td>
+      <td>${u.postsCount||0}</td>
+      <td>${u.followersCount||0}</td>
+      <td>${new Date(u.createdAt).toLocaleDateString('vi-VN')}</td>
+      <td><div class="admin-actions">
+        <button class="btn btn-sm btn-secondary" onclick="toggleRole('${u._id}','${u.role}')">${u.role === 'admin' ? 'Hạ quyền' : 'Cấp admin'}</button>
+        <button class="btn btn-sm btn-secondary" onclick="toggleBan('${u._id}', ${u.isBanned ? 'false' : 'true'})">${u.isBanned ? 'Mở khóa' : 'Khóa'}</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteUser('${u._id}')">Xóa</button>
+      </div></td>
+    </tr>`).join('') : `<tr><td colspan="8"><div class="empty-state">Không có người dùng nào</div></td></tr>`;
+  renderPagination('usersPagination', res.page, res.pages, (pg) => { state.page.users = pg; loadUsers(); });
+}
+
+async function toggleRole(id, currentRole) {
+  const newRole = currentRole === 'admin' ? 'user' : 'admin';
+  if (!confirm(newRole === 'admin' ? 'Cấp quyền admin cho người dùng này?' : 'Hạ quyền người dùng này về user thường?')) return;
+  const res = await API.put(`/admin/users/${id}/role`, { role: newRole });
+  if (res?.success) { Toast.success(res.message); loadUsers(); loadStats(); }
+  else Toast.error(res?.message || 'Có lỗi xảy ra');
+}
+
+async function toggleBan(id, ban) {
+  const isBan = ban === 'true';
+  let banReason = '';
+  if (isBan) {
+    banReason = prompt('Lý do khóa tài khoản (không bắt buộc):') || '';
+    if (banReason === null) return;
+  } else if (!confirm('Mở khóa tài khoản này?')) return;
+  const res = await API.put(`/admin/users/${id}/ban`, { isBanned: isBan, banReason });
+  if (res?.success) { Toast.success(res.message); loadUsers(); loadStats(); }
+  else Toast.error(res?.message || 'Có lỗi xảy ra');
+}
+
+async function deleteUser(id) {
+  if (!confirm('Xóa vĩnh viễn người dùng này? Toàn bộ bài viết và video của họ cũng sẽ bị xóa.')) return;
+  const res = await API.delete(`/admin/users/${id}`);
+  if (res?.success) { Toast.success(res.message); loadUsers(); loadStats(); }
+  else Toast.error(res?.message || 'Có lỗi xảy ra');
+}
+
+// ===== POSTS =====
+async function loadPosts() {
+  const p = state.page.posts;
+  const res = await API.get(`/admin/posts?page=${p}&limit=15&search=${encodeURIComponent(state.search)}`);
+  if (!res?.success) return;
+  document.getElementById('postsTbody').innerHTML = res.posts.length ? res.posts.map(post => `
+    <tr>
+      <td><div class="admin-user-cell"><img src="${avatarURL(post.author)}" class="avatar avatar-xs" alt=""><div>@${esc(post.author?.username||'?')}</div></div></td>
+      <td style="max-width:320px">${esc((post.content||'').slice(0,140))}${(post.content||'').length>140?'…':''}</td>
+      <td>${post.likesCount||0}</td>
+      <td>${post.commentsCount||0}</td>
+      <td>${new Date(post.createdAt).toLocaleDateString('vi-VN')}</td>
+      <td><div class="admin-actions"><button class="btn btn-sm btn-danger" onclick="deletePost('${post._id}')">Xóa</button></div></td>
+    </tr>`).join('') : `<tr><td colspan="6"><div class="empty-state">Không có bài viết nào</div></td></tr>`;
+  renderPagination('postsPagination', res.page, res.pages, (pg) => { state.page.posts = pg; loadPosts(); });
+}
+
+async function deletePost(id) {
+  if (!confirm('Xóa bài viết này?')) return;
+  const res = await API.delete(`/admin/posts/${id}`);
+  if (res?.success) { Toast.success(res.message); loadPosts(); loadStats(); }
+  else Toast.error(res?.message || 'Có lỗi xảy ra');
+}
+
+// ===== VIDEOS =====
+async function loadVideos() {
+  const p = state.page.videos;
+  const res = await API.get(`/admin/videos?page=${p}&limit=15&search=${encodeURIComponent(state.search)}`);
+  if (!res?.success) return;
+  document.getElementById('videosTbody').innerHTML = res.videos.length ? res.videos.map(v => `
+    <tr>
+      <td><div class="admin-user-cell"><img src="${avatarURL(v.author)}" class="avatar avatar-xs" alt=""><div>@${esc(v.author?.username||'?')}</div></div></td>
+      <td style="max-width:280px">${esc(v.title||'(không có tiêu đề)')}</td>
+      <td>${formatNum(v.viewsCount||0)}</td>
+      <td>${v.likesCount||0}</td>
+      <td>${new Date(v.createdAt).toLocaleDateString('vi-VN')}</td>
+      <td><div class="admin-actions"><button class="btn btn-sm btn-danger" onclick="deleteVideo('${v._id}')">Xóa</button></div></td>
+    </tr>`).join('') : `<tr><td colspan="6"><div class="empty-state">Không có video nào</div></td></tr>`;
+  renderPagination('videosPagination', res.page, res.pages, (pg) => { state.page.videos = pg; loadVideos(); });
+}
+
+async function deleteVideo(id) {
+  if (!confirm('Xóa video này?')) return;
+  const res = await API.delete(`/admin/videos/${id}`);
+  if (res?.success) { Toast.success(res.message); loadVideos(); loadStats(); }
+  else Toast.error(res?.message || 'Có lỗi xảy ra');
+}
+
+checkAccessAndInit();
+</script>
+</body>
+</html>
