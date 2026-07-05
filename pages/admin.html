@@ -29,6 +29,7 @@
 .access-denied { text-align: center; padding: 80px 20px; }
 .role-pill { padding: 2px 9px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; }
 .role-pill.admin { background: rgba(124,92,252,0.18); color: var(--brand); }
+.role-pill.moderator { background: rgba(245,184,76,0.18); color: #F5B84C; }
 .role-pill.user { background: var(--bg-elevated); color: var(--text-muted); }
 .ban-pill { padding: 2px 9px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; background: rgba(252,92,92,0.15); color: #FC5C5C; }
 .empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
@@ -65,7 +66,7 @@
   <div id="panel-users" class="admin-panel">
     <div class="admin-table-wrap">
       <table class="admin-table">
-        <thead><tr><th>Người dùng</th><th>Email</th><th>Quyền</th><th>Trạng thái</th><th>Bài viết</th><th>Theo dõi</th><th>Ngày tham gia</th><th>Hành động</th></tr></thead>
+        <thead><tr><th>Người dùng</th><th>Email</th><th>Quyền</th><th>Trạng thái</th><th>Xu VIP</th><th>Bài viết</th><th>Ngày tham gia</th><th>Hành động</th></tr></thead>
         <tbody id="usersTbody"></tbody>
       </table>
     </div>
@@ -111,10 +112,11 @@ function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt
 async function checkAccessAndInit() {
   await Layout.init();
   const user = API.getCurrentUser();
-  if (!user || user.role !== 'admin') {
+  if (!user || !['admin', 'moderator'].includes(user.role)) {
     document.getElementById('accessDenied').style.display = 'block';
     return;
   }
+  state.myRole = user.role;
   document.getElementById('adminContent').style.display = 'block';
   await loadStats();
   await loadUsers();
@@ -176,29 +178,48 @@ async function loadUsers() {
   const p = state.page.users;
   const res = await API.get(`/admin/users?page=${p}&limit=15&search=${encodeURIComponent(state.search)}`);
   if (!res?.success) return;
-  document.getElementById('usersTbody').innerHTML = res.users.length ? res.users.map(u => `
+  const isAdmin = state.myRole === 'admin';
+  document.getElementById('usersTbody').innerHTML = res.users.length ? res.users.map(u => {
+    const targetIsStaff = ['admin', 'moderator'].includes(u.role);
+    const canManage = isAdmin || !targetIsStaff; // điều hành không được đụng vào admin/điều hành khác
+    return `
     <tr class="${u.isBanned ? 'is-banned' : ''}">
       <td><div class="admin-user-cell"><img src="${avatarURL(u)}" class="avatar avatar-xs" alt=""><div><div style="font-weight:600">${esc(u.displayName || u.username)}</div><div style="color:var(--text-muted);font-size:0.78rem">@${esc(u.username)}</div></div></div></td>
       <td>${esc(u.email)}</td>
-      <td><span class="role-pill ${u.role}">${u.role === 'admin' ? 'Admin' : 'User'}</span></td>
+      <td><span class="role-pill ${u.role}">${u.role === 'admin' ? 'Admin' : u.role === 'moderator' ? 'Điều hành' : 'User'}</span></td>
       <td>${u.isBanned ? `<span class="ban-pill" title="${esc(u.banReason||'')}">Bị khóa</span>` : '<span style="color:#3DDC84">Hoạt động</span>'}</td>
+      <td>${(u.vipCoin||0).toLocaleString()} Xu</td>
       <td>${u.postsCount||0}</td>
-      <td>${u.followersCount||0}</td>
       <td>${new Date(u.createdAt).toLocaleDateString('vi-VN')}</td>
       <td><div class="admin-actions">
-        <button class="btn btn-sm btn-secondary" onclick="toggleRole('${u._id}','${u.role}')">${u.role === 'admin' ? 'Hạ quyền' : 'Cấp admin'}</button>
-        <button class="btn btn-sm btn-secondary" onclick="toggleBan('${u._id}', ${u.isBanned ? 'false' : 'true'})">${u.isBanned ? 'Mở khóa' : 'Khóa'}</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteUser('${u._id}')">Xóa</button>
+        ${isAdmin ? `<select class="btn btn-sm btn-secondary" onchange="changeRole('${u._id}', this.value)" ${u._id===API.getCurrentUser()._id ? 'disabled' : ''}>
+          <option value="user" ${u.role==='user'?'selected':''}>User</option>
+          <option value="moderator" ${u.role==='moderator'?'selected':''}>Điều hành</option>
+          <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+        </select>` : ''}
+        ${isAdmin ? `<button class="btn btn-sm btn-secondary" onclick="adjustCoin('${u._id}','${esc(u.username)}')">± Xu</button>` : ''}
+        ${canManage ? `<button class="btn btn-sm btn-secondary" onclick="toggleBan('${u._id}', ${u.isBanned ? 'false' : 'true'})">${u.isBanned ? 'Mở khóa' : 'Khóa'}</button>` : ''}
+        ${canManage ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u._id}')">Xóa</button>` : ''}
       </div></td>
-    </tr>`).join('') : `<tr><td colspan="8"><div class="empty-state">Không có người dùng nào</div></td></tr>`;
+    </tr>`;
+  }).join('') : `<tr><td colspan="8"><div class="empty-state">Không có người dùng nào</div></td></tr>`;
   renderPagination('usersPagination', res.page, res.pages, (pg) => { state.page.users = pg; loadUsers(); });
 }
 
-async function toggleRole(id, currentRole) {
-  const newRole = currentRole === 'admin' ? 'user' : 'admin';
-  if (!confirm(newRole === 'admin' ? 'Cấp quyền admin cho người dùng này?' : 'Hạ quyền người dùng này về user thường?')) return;
+async function changeRole(id, newRole) {
+  if (!confirm(`Đổi quyền người dùng này thành "${newRole}"?`)) { loadUsers(); return; }
   const res = await API.put(`/admin/users/${id}/role`, { role: newRole });
   if (res?.success) { Toast.success(res.message); loadUsers(); loadStats(); }
+  else { Toast.error(res?.message || 'Có lỗi xảy ra'); loadUsers(); }
+}
+
+async function adjustCoin(id, username) {
+  const input = prompt(`Nhập số Xu VIP cần cộng/trừ cho @${username} (vd: 50 để cộng, -20 để trừ):`);
+  if (input === null || input.trim() === '') return;
+  const amount = Number(input);
+  if (!amount || Number.isNaN(amount)) { Toast.error('Số không hợp lệ'); return; }
+  const res = await API.put(`/admin/users/${id}/coin`, { amount });
+  if (res?.success) { Toast.success(res.message); loadUsers(); }
   else Toast.error(res?.message || 'Có lỗi xảy ra');
 }
 

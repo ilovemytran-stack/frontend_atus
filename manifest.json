@@ -13,5 +13,14 @@
   ],
   "categories": ["social", "shopping"],
   "screenshots": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "G.Legendary",
+      "short_name": "G.Legendary",
+      "description": "Mở thẳng vào game G.Legendary",
+      "url": "/pages/game.html",
+      "icons": [{ "src": "assets/game/icon-game-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
 }

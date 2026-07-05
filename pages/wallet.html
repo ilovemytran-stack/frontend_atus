@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ví Xu VIP – Public</title>
+<link rel="stylesheet" href="/css/global.css">
+<style>
+.wallet-page { max-width: 620px; margin: 0 auto; padding-bottom: 40px; }
+.wallet-header { padding: 18px 16px 8px; }
+.wallet-header h2 { font-size: 1.3rem; font-weight: 800; }
+.wallet-balance-card { margin: 12px 16px; padding: 20px; border-radius: var(--radius-lg); background: linear-gradient(135deg, #2a2210, #1a1608); border: 1px solid rgba(245,184,76,0.35); text-align: center; }
+.wallet-balance-label { font-size: 0.75rem; color: var(--text-muted); letter-spacing: 0.05em; }
+.wallet-balance-value { font-size: 2.2rem; font-weight: 900; color: #F5B84C; margin-top: 4px; }
+.wallet-tabs { display: flex; gap: 6px; margin: 0 16px 12px; border-bottom: 1px solid var(--border); }
+.wallet-tab { flex: 1; text-align: center; padding: 10px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); border-bottom: 2px solid transparent; background: none; border-top: none; border-left: none; border-right: none; }
+.wallet-tab.active { color: #F5B84C; border-color: #F5B84C; }
+.wallet-panel { padding: 0 16px; }
+.topup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.topup-card { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; text-align: center; cursor: pointer; }
+.topup-card b { display: block; font-size: 1.1rem; margin: 6px 0 2px; }
+.topup-card span { font-size: 0.72rem; color: var(--text-muted); }
+.maintenance-note { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-md); background: rgba(255,255,255,0.04); border: 1px dashed var(--border); font-size: 0.8rem; color: var(--text-muted); text-align: center; }
+.pkg-list { display: flex; flex-direction: column; gap: 10px; }
+.pkg-card { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; }
+.pkg-card b { color: #F5B84C; }
+.pkg-reward { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <main class="main-content">
+    <header class="mobile-header">
+      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <div class="mobile-header-logo">Ví Xu VIP</div>
+      <div style="width:40px"></div>
+    </header>
+
+    <div class="wallet-page">
+      <div class="wallet-header"><h2>Ví Xu VIP</h2></div>
+      <div class="wallet-balance-card">
+        <div class="wallet-balance-label">SỐ DƯ HIỆN TẠI</div>
+        <div class="wallet-balance-value" id="walletBalance">0 Xu</div>
+      </div>
+
+      <div class="wallet-tabs">
+        <button class="wallet-tab active" data-tab="topup">Nạp Xu VIP</button>
+        <button class="wallet-tab" data-tab="exchange">Đổi Xu → Vàng/Ngọc</button>
+      </div>
+
+      <div class="wallet-panel" id="tabTopup">
+        <div class="topup-grid">
+          <div class="topup-card" data-amount="10"><b>10 Xu</b><span>~10.000đ</span></div>
+          <div class="topup-card" data-amount="50"><b>50 Xu</b><span>~50.000đ</span></div>
+          <div class="topup-card" data-amount="100"><b>100 Xu</b><span>~100.000đ</span></div>
+          <div class="topup-card" data-amount="500"><b>500 Xu</b><span>~500.000đ</span></div>
+        </div>
+        <div class="maintenance-note" id="topupNote">Chọn mệnh giá để xem trạng thái nạp.</div>
+      </div>
+
+      <div class="wallet-panel" id="tabExchange" style="display:none">
+        <div class="pkg-list" id="pkgList"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<nav class="bottom-nav" id="bottom-nav"></nav>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => { Layout.init(); loadWallet(); bindTabs(); bindTopupCards(); });
+
+async function loadWallet() {
+  const res = await API.get('/wallet/me');
+  if (res?.success) document.getElementById('walletBalance').textContent = res.vipCoin + ' Xu';
+  const pkgRes = await API.get('/wallet/packages');
+  if (pkgRes?.success) renderPackages(pkgRes.packages);
+}
+
+function bindTabs() {
+  document.querySelectorAll('.wallet-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.wallet-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tabTopup').style.display = btn.dataset.tab === 'topup' ? 'block' : 'none';
+      document.getElementById('tabExchange').style.display = btn.dataset.tab === 'exchange' ? 'block' : 'none';
+    });
+  });
+}
+
+function bindTopupCards() {
+  document.querySelectorAll('.topup-card').forEach(card => {
+    card.addEventListener('click', async () => {
+      const res = await API.post('/wallet/topup-request', { amount: card.dataset.amount });
+      document.getElementById('topupNote').textContent = res?.message || 'Chức năng đang bảo trì, vui lòng liên hệ admin.';
+    });
+  });
+}
+
+function renderPackages(packages) {
+  document.getElementById('pkgList').innerHTML = packages.map(p => `
+    <div class="pkg-card">
+      <div>
+        <b>${p.vipCoin} Xu VIP</b> — ${p.label}
+        <div class="pkg-reward">🪙 ${p.gold.toLocaleString()} Vàng · 💎 ${p.gem.toLocaleString()} Ngọc</div>
+      </div>
+      <button class="btn btn-primary btn-sm" data-exchange="${p.id}">Đổi ngay</button>
+    </div>`).join('');
+  document.querySelectorAll('[data-exchange]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const res = await API.post('/wallet/exchange', { packageId: btn.dataset.exchange });
+      if (res?.success) {
+        Toast.success(res.message);
+        document.getElementById('walletBalance').textContent = res.vipCoin + ' Xu';
+        document.getElementById('sidebar-vipcoin') && (document.getElementById('sidebar-vipcoin').textContent = res.vipCoin);
+      } else {
+        Toast.error(res?.message || 'Không thể đổi Xu');
+      }
+      btn.disabled = false;
+    });
+  });
+}
+</script>
+</body>
+</html>

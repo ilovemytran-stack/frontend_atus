@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>G.Legendary — SocialShop</title>
+<link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/game.css">
+<link rel="manifest" href="/manifest.json">
+</head>
+<body class="gl-body">
+
+<!-- Loading -->
+<div id="glLoading" class="gl-loading">
+  <div class="gl-loading-crest">⚔</div>
+  <div class="gl-loading-title">G.LEGENDARY</div>
+  <div class="gl-loading-bar"><div class="gl-loading-fill" id="glLoadingFill"></div></div>
+  <div class="gl-loading-hint" id="glLoadingHint">Đang mở cổng dịch chuyển…</div>
+</div>
+
+<!-- Xoay ngang màn hình -->
+<div id="glRotatePrompt" class="gl-rotate-prompt" style="display:none">
+  <div class="gl-rotate-icon">📱</div>
+  <div class="gl-rotate-text">Xoay ngang màn hình để tiếp tục</div>
+</div>
+
+<!-- Chọn nhân vật -->
+<div id="glCharSelect" class="gl-charselect" style="display:none">
+  <a href="index.html" class="gl-exit-btn" title="Về trang chủ">✕</a>
+  <div class="gl-charselect-header">
+    <div class="gl-charselect-eyebrow">THE REALM OF GODS</div>
+    <div class="gl-charselect-title">G.LEGENDARY</div>
+  </div>
+  <div class="gl-classlist" id="glClassList"></div>
+  <div class="gl-charselect-footer">
+    <div class="gl-classdetail" id="glClassDetail"></div>
+    <input id="glNameInput" class="gl-name-input" maxlength="20" placeholder="Tên nhân vật" />
+    <button id="glCreateBtn" class="gl-cta-btn" disabled>CHỌN NHÂN VẬT NÀY</button>
+  </div>
+</div>
+
+<!-- Màn hình chơi -->
+<div id="glGame" class="gl-game" style="display:none">
+  <canvas id="glCanvas"></canvas>
+
+  <!-- Thanh trạng thái trên cùng -->
+  <div class="gl-topbar">
+    <div class="gl-portrait-frame" id="glTopPortrait"></div>
+    <div class="gl-vitals">
+      <div class="gl-namerow"><span id="glCharName">—</span><span class="gl-lvl">Lv.<span id="glCharLevel">1</span></span></div>
+      <div class="gl-bar gl-bar-hp"><div class="gl-bar-fill" id="glHpFill"></div><span class="gl-bar-label" id="glHpLabel">0/0</span></div>
+      <div class="gl-bar gl-bar-ki"><div class="gl-bar-fill" id="glKiFill"></div><span class="gl-bar-label" id="glKiLabel">0/0</span></div>
+      <div class="gl-bar gl-bar-xp"><div class="gl-bar-fill" id="glXpFill"></div></div>
+    </div>
+    <div class="gl-currency">
+      <div class="gl-cur"><span class="gl-cur-icon gl-gold">🪙</span><span id="glGold">0</span></div>
+      <div class="gl-cur"><span class="gl-cur-icon gl-gem">💎</span><span id="glGem">0</span></div>
+    </div>
+  </div>
+
+  <!-- Ô mục tiêu đang chọn — chỉ hiện khi có mục tiêu -->
+  <div class="gl-targetframe" id="glTargetFrame" style="display:none">
+    <span class="gl-target-name" id="glTargetName">—</span>
+    <div class="gl-bar gl-bar-hp gl-target-hpbar"><div class="gl-bar-fill" id="glTargetHpFill"></div></div>
+  </div>
+
+  <!-- Góc trên trái: hành trang -->
+  <button class="gl-icon-btn gl-corner-tl" id="glBtnInventory" title="Hành trang">🎒</button>
+
+  <!-- Góc trên phải: menu + bản đồ + thông báo -->
+  <div class="gl-corner-tr">
+    <button class="gl-icon-btn" id="glBtnMenu" title="Menu">☰</button>
+    <button class="gl-icon-btn" id="glBtnFriends" title="Bạn bè">👥<span class="gl-notif-dot" id="glFriendDot" style="display:none"></span></button>
+    <button class="gl-icon-btn" id="glBtnMap" title="Bản đồ">🗺️</button>
+    <button class="gl-icon-btn" id="glBtnNotif" title="Thông báo">🔔<span class="gl-notif-dot" id="glNotifDot" style="display:none"></span></button>
+  </div>
+
+  <!-- Góc dưới trái: joystick di chuyển -->
+  <div class="gl-joystick-zone" id="glJoyZone">
+    <div class="gl-joystick-base" id="glJoyBase"><div class="gl-joystick-stick" id="glJoyStick"></div></div>
+  </div>
+
+  <!-- Góc dưới phải: đánh thường + chiêu -->
+  <div class="gl-action-zone">
+    <button class="gl-skill-btn" id="glSkill1" data-skill-slot="1"><span class="gl-skill-icon">①</span><div class="gl-cd-overlay" id="glCd1"></div></button>
+    <button class="gl-skill-btn" id="glSkill2" data-skill-slot="2"><span class="gl-skill-icon">②</span><div class="gl-cd-overlay" id="glCd2"></div></button>
+    <button class="gl-attack-btn" id="glAttackBtn">ĐÁNH</button>
+  </div>
+
+  <!-- Người chơi khác / chat nhanh trong map -->
+  <div class="gl-maplabel" id="glMapLabel" role="button">—</div>
+
+  <!-- Popup đổi khu vực -->
+  <div class="gl-panel-overlay" id="glPanelZone" style="display:none">
+    <div class="gl-panel" style="max-width:360px">
+      <div class="gl-panel-head"><span>ĐỔI KHU VỰC</span><button class="gl-panel-close" data-close>✕</button></div>
+      <div class="gl-panel-body" id="glZoneBody"></div>
+    </div>
+  </div>
+  <div class="gl-chatlog" id="glChatLog"></div>
+  <div class="gl-chat-toggle" id="glChatToggle">💬</div>
+  <div class="gl-chatbar" id="glChatBar" style="display:none">
+    <input id="glChatInput" maxlength="140" placeholder="Nhắn với người chơi gần đây…" />
+    <button id="glChatSend">Gửi</button>
+  </div>
+
+  <!-- Toast nổi (loot, lên cấp) -->
+  <div class="gl-floattoast" id="glFloatToast"></div>
+</div>
+
+<!-- Panel: Hành trang / Trang bị -->
+<div class="gl-panel-overlay" id="glPanelInventory" style="display:none">
+  <div class="gl-panel">
+    <div class="gl-panel-head"><span>HÀNH TRANG &amp; TRANG BỊ</span><button class="gl-panel-close" data-close>✕</button></div>
+    <div class="gl-panel-tabs">
+      <button class="gl-tab active" data-tab="equip">Trang bị</button>
+      <button class="gl-tab" data-tab="bag">Túi đồ</button>
+      <button class="gl-tab" data-tab="stats">Thuộc tính</button>
+      <button class="gl-tab" data-tab="skills">Chiêu thức</button>
+    </div>
+    <div class="gl-panel-body" id="glPanelBody"></div>
+  </div>
+</div>
+
+<!-- Panel: Bản đồ -->
+<div class="gl-panel-overlay" id="glPanelMap" style="display:none">
+  <div class="gl-panel">
+    <div class="gl-panel-head"><span>BẢN ĐỒ VƯƠNG QUỐC</span><button class="gl-panel-close" data-close>✕</button></div>
+    <div class="gl-panel-body" id="glMapBody"></div>
+  </div>
+</div>
+
+<!-- Panel: Thông báo -->
+<div class="gl-panel-overlay" id="glPanelNotif" style="display:none">
+  <div class="gl-panel">
+    <div class="gl-panel-head"><span>THÔNG BÁO</span><button class="gl-panel-close" data-close>✕</button></div>
+    <div class="gl-panel-body" id="glNotifBody"></div>
+  </div>
+</div>
+
+<!-- Panel: NPC -->
+<div class="gl-panel-overlay" id="glPanelNpc" style="display:none">
+  <div class="gl-panel">
+    <div class="gl-panel-head"><span id="glNpcTitle">NPC</span><button class="gl-panel-close" data-close>✕</button></div>
+    <div class="gl-panel-body" id="glNpcBody"></div>
+  </div>
+</div>
+
+<!-- Panel: Bạn bè -->
+<div class="gl-panel-overlay" id="glPanelFriends" style="display:none">
+  <div class="gl-panel">
+    <div class="gl-panel-head"><span>BẠN BÈ</span><button class="gl-panel-close" data-close>✕</button></div>
+    <div class="gl-panel-tabs">
+      <button class="gl-tab active" data-ftab="list">Bạn bè</button>
+      <button class="gl-tab" data-ftab="requests">Lời mời</button>
+      <button class="gl-tab" data-ftab="search">Tìm bạn</button>
+    </div>
+    <div class="gl-panel-body" id="glFriendsBody"></div>
+  </div>
+</div>
+
+<!-- Popup: lời mời giao dịch đến -->
+<div class="gl-panel-overlay" id="glTradeRequestPopup" style="display:none">
+  <div class="gl-panel" style="max-width:320px">
+    <div class="gl-panel-body" style="text-align:center;padding:24px 18px">
+      <div style="font-size:.9rem;margin-bottom:16px"><b id="glTradeReqName">?</b> muốn giao dịch với bạn</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="gl-btn-sm" id="glTradeReqDecline" style="background:rgba(232,92,76,.15);border-color:#E85C4C;color:#E85C4C">Từ chối</button>
+        <button class="gl-cta-btn" id="glTradeReqAccept" style="padding:8px 18px">Đồng ý</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel: Cửa sổ giao dịch -->
+<div class="gl-panel-overlay" id="glPanelTrade" style="display:none">
+  <div class="gl-panel" style="width:min(96vw,720px)">
+    <div class="gl-panel-head"><span>GIAO DỊCH VỚI <span id="glTradePartnerName">?</span></span><button class="gl-panel-close" id="glTradeCloseBtn">✕</button></div>
+    <div class="gl-panel-body">
+      <div class="gl-trade-grid">
+        <div class="gl-trade-side">
+          <div class="gl-trade-label">Đề nghị của bạn <span id="glTradeMeConfirmed" class="gl-trade-confirm-badge" style="display:none">✔ Đã xác nhận</span></div>
+          <div class="gl-trade-currency-row">
+            <label>🪙 <input type="number" id="glTradeMyGold" min="0" value="0"></label>
+            <label>💎 <input type="number" id="glTradeMyGem" min="0" value="0"></label>
+          </div>
+          <div class="gl-grid" id="glTradeMyItems"></div>
+        </div>
+        <div class="gl-trade-side">
+          <div class="gl-trade-label">Đề nghị của <span id="glTradePartnerName2">đối phương</span> <span id="glTradePartnerConfirmed" class="gl-trade-confirm-badge" style="display:none">✔ Đã xác nhận</span></div>
+          <div class="gl-trade-currency-row" id="glTradeTheirCurrency">🪙 0 · 💎 0</div>
+          <div class="gl-grid" id="glTradeTheirItems"></div>
+        </div>
+      </div>
+      <button class="gl-cta-btn" id="glTradeConfirmBtn" style="margin-top:14px">XÁC NHẬN GIAO DỊCH</button>
+    </div>
+  </div>
+</div>
+
+<!-- Panel: Thách đấu Thần Linh -->
+<div class="gl-panel-overlay" id="glPanelDuel" style="display:none">
+  <div class="gl-panel gl-duel-panel">
+    <div class="gl-duel-arena" id="glDuelArena">
+      <div class="gl-duel-side gl-duel-god">
+        <div class="gl-duel-portrait" id="glDuelGodPortrait">👑</div>
+        <div class="gl-duel-name" id="glDuelGodName">?</div>
+        <div class="gl-bar gl-bar-hp"><div class="gl-bar-fill" id="glDuelGodHpFill"></div><span class="gl-bar-label" id="glDuelGodHpLabel">0/0</span></div>
+      </div>
+      <div class="gl-duel-vs">VS</div>
+      <div class="gl-duel-side gl-duel-player">
+        <div class="gl-duel-portrait" id="glDuelPlayerPortrait"></div>
+        <div class="gl-duel-name" id="glDuelPlayerName">?</div>
+        <div class="gl-bar gl-bar-hp"><div class="gl-bar-fill" id="glDuelPlayerHpFill"></div><span class="gl-bar-label" id="glDuelPlayerHpLabel">0/0</span></div>
+      </div>
+    </div>
+    <div class="gl-duel-log" id="glDuelLog"></div>
+    <div class="gl-duel-actions">
+      <button class="gl-attack-btn" id="glDuelAttackBtn" style="width:64px;height:64px;font-size:.7rem">ĐÁNH</button>
+      <button class="gl-skill-btn" id="glDuelSkill1">①</button>
+      <button class="gl-skill-btn" id="glDuelSkill2">②</button>
+      <button class="gl-btn-sm" id="glDuelFleeBtn" style="margin-left:auto">Rút lui</button>
+    </div>
+  </div>
+</div>
+
+<!-- Panel: Menu chính -->
+<div class="gl-panel-overlay" id="glPanelMenu" style="display:none">
+  <div class="gl-panel">
+    <div class="gl-panel-head"><span>MENU</span><button class="gl-panel-close" data-close>✕</button></div>
+    <div class="gl-panel-body" id="glMenuBody">
+      <div class="gl-menu-grid">
+        <button class="gl-menu-item" data-open="glPanelInventory-equip">🎒<span>Hành Trang</span></button>
+        <button class="gl-menu-item" data-open="glPanelInventory-skills">✨<span>Kỹ Năng</span></button>
+        <button class="gl-menu-item" data-open="glPanelInventory-stats">📊<span>Thuộc Tính</span></button>
+        <button class="gl-menu-item" data-open="glPanelMap">🗺️<span>Bản Đồ</span></button>
+        <button class="gl-menu-item" data-open="glPanelFriends">👥<span>Bạn Bè</span></button>
+        <button class="gl-menu-item" data-open="glPanelNotif">🔔<span>Thông Báo</span></button>
+        <button class="gl-menu-item" disabled>🏯<span>Bang Hội</span><small>Sắp ra mắt</small></button>
+        <button class="gl-menu-item" disabled>🌐<span>Chat Thế Giới</span><small>Sắp ra mắt</small></button>
+        <button class="gl-menu-item" id="glMenuLoadout">🎯<span>Gắn Chiêu</span></button>
+        <button class="gl-menu-item" id="glMenuAccount">👤<span>Tài Khoản</span></button>
+        <button class="gl-menu-item gl-menu-exit" id="glMenuExit">🚪<span>Thoát Game</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Panel: Gắn chiêu ra ngoài màn hình -->
+<div class="gl-panel-overlay" id="glPanelLoadout" style="display:none">
+  <div class="gl-panel">
+    <div class="gl-panel-head"><span>GẮN CHIÊU RA MÀN HÌNH</span><button class="gl-panel-close" data-close>✕</button></div>
+    <div class="gl-panel-body" id="glLoadoutBody"></div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/game/game-data-cache.js"></script>
+<script src="/js/game/game-render.js"></script>
+<script src="/js/game/game-entities.js"></script>
+<script src="/js/game/game-controls.js"></script>
+<script src="/js/game/game-network.js"></script>
+<script src="/js/game/game-ui.js"></script>
+<script src="/js/game/game-social.js"></script>
+<script src="/js/game/game-worldevents.js"></script>
+<script src="/js/game/game-duel.js"></script>
+<script src="/js/game/game-menu.js"></script>
+<script src="/js/game/game-main.js"></script>
+</body>
+</html>

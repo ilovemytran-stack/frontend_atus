@@ -150,6 +150,16 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .sidebar-icon svg, .bottom-nav-item .icon svg { transition: var(--transition); }
 .sidebar-item.active .icon-svg, .bottom-nav-item.active .icon-svg { color: var(--brand); }
 
+/* G.Legendary sidebar entry */
+.sidebar-item-game { position: relative; background: linear-gradient(90deg, rgba(245,184,76,0.14), transparent); border-radius: var(--radius-sm); }
+.sidebar-item-game .sidebar-icon { color: #F5B84C; }
+.sidebar-tag { margin-left: auto; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.03em; color: #17130a; background: linear-gradient(135deg,#F5D061,#F5B84C); padding: 2px 6px; border-radius: var(--radius-full); }
+
+/* Ví Xu VIP trong sidebar */
+.sidebar-wallet-chip { display: flex; align-items: center; gap: 8px; margin: 4px 12px 8px; padding: 8px 12px; border-radius: var(--radius-md); background: linear-gradient(90deg, rgba(245,184,76,0.12), rgba(245,184,76,0.03)); border: 1px solid rgba(245,184,76,0.3); text-decoration: none; color: var(--text); font-size: 0.8rem; }
+.sidebar-wallet-chip .sidebar-icon { color: #F5B84C; }
+.sidebar-wallet-chip b { color: #F5B84C; }
+
 /* Page + interaction polish */
 body { animation: fadeIn 0.25s ease; }
 .btn { transition: var(--transition), transform 0.1s ease; }

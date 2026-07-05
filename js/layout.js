@@ -10,6 +10,8 @@ const Icon = (() => {
     user: wrap('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),
     logout: wrap('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'),
     admin: wrap('<path d="M12 2l8 4v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/>'),
+    sword: wrap('<path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/>'),
+    wallet: wrap('<rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="17" cy="15" r="1.4"/>'),
   };
 })();
 
@@ -48,24 +50,31 @@ class Layout {
       { href: 'index.html', icon: Icon.home, label: 'Trang chủ' },
       { href: 'explore.html', icon: Icon.search, label: 'Khám phá' },
       { href: 'videos.html', icon: Icon.film, label: 'Video' },
+      { href: 'game.html', icon: Icon.sword, label: 'G.Legendary', gameNew: true },
+      { href: 'wallet.html', icon: Icon.wallet, label: 'Ví Xu VIP' },
       { href: 'messages.html', icon: Icon.message, label: 'Tin nhắn', badge: 'msg' },
       { href: 'notifications.html', icon: Icon.bell, label: 'Thông báo', badge: 'notif' },
       { href: user ? `profile.html?u=${user.username}` : 'login.html', icon: Icon.user, label: 'Trang cá nhân' },
     ];
-    if (user?.role === 'admin') {
-      navItems.push({ href: 'admin.html', icon: Icon.admin, label: 'Quản trị' });
+    if (user?.role === 'admin' || user?.role === 'moderator') {
+      navItems.push({ href: 'admin.html', icon: Icon.admin, label: user.role === 'admin' ? 'Quản trị' : 'Điều hành' });
     }
     sidebar.innerHTML = `
       <div class="sidebar-logo">
         <div class="sidebar-logo-icon">🌐</div>
         <span class="sidebar-logo-text">Public</span>
       </div>
+      ${user ? `<a href="wallet.html" class="sidebar-wallet-chip">
+        <span class="sidebar-icon">${Icon.wallet}</span>
+        <span>Xu VIP: <b id="sidebar-vipcoin">${user.vipCoin ?? 0}</b></span>
+      </a>` : ''}
       <nav class="sidebar-nav">
         ${navItems.map(i => `
-          <a href="${i.href}" class="sidebar-item ${current === i.href ? 'active' : ''}">
+          <a href="${i.href}" class="sidebar-item ${current === i.href ? 'active' : ''} ${i.gameNew ? 'sidebar-item-game' : ''}">
             <span class="sidebar-icon">${i.icon}</span>
             <span class="sidebar-label">${i.label}</span>
             ${i.badge === 'notif' ? '<span class="sidebar-badge" id="notif-badge" style="display:none">0</span>' : ''}
+            ${i.gameNew ? '<span class="sidebar-tag">MỚI</span>' : ''}
           </a>`).join('')}
       </nav>
       <div class="sidebar-actions">
