@@ -51,7 +51,7 @@ class Layout {
       { href: 'explore.html', icon: Icon.search, label: 'Khám phá' },
       { href: 'videos.html', icon: Icon.film, label: 'Video' },
       { href: 'game.html', icon: Icon.sword, label: 'G.Legendary', gameNew: true },
-      { href: 'wallet.html', icon: Icon.wallet, label: 'Ví Xu VIP' },
+      { href: 'wallet.html', icon: Icon.wallet, label: 'Ví Xu VIP', vipCoinBadge: true },
       { href: 'messages.html', icon: Icon.message, label: 'Tin nhắn', badge: 'msg' },
       { href: 'notifications.html', icon: Icon.bell, label: 'Thông báo', badge: 'notif' },
       { href: user ? `profile.html?u=${user.username}` : 'login.html', icon: Icon.user, label: 'Trang cá nhân' },
@@ -64,16 +64,13 @@ class Layout {
         <div class="sidebar-logo-icon">🌐</div>
         <span class="sidebar-logo-text">Public</span>
       </div>
-      ${user ? `<a href="wallet.html" class="sidebar-wallet-chip">
-        <span class="sidebar-icon">${Icon.wallet}</span>
-        <span>Xu VIP: <b id="sidebar-vipcoin">${user.vipCoin ?? 0}</b></span>
-      </a>` : ''}
       <nav class="sidebar-nav">
         ${navItems.map(i => `
           <a href="${i.href}" class="sidebar-item ${current === i.href ? 'active' : ''} ${i.gameNew ? 'sidebar-item-game' : ''}">
             <span class="sidebar-icon">${i.icon}</span>
             <span class="sidebar-label">${i.label}</span>
             ${i.badge === 'notif' ? '<span class="sidebar-badge" id="notif-badge" style="display:none">0</span>' : ''}
+            ${i.vipCoinBadge ? `<span class="sidebar-badge sidebar-badge-gold" id="sidebar-vipcoin">${user?.vipCoin ?? 0}</span>` : ''}
             ${i.gameNew ? '<span class="sidebar-tag">MỚI</span>' : ''}
           </a>`).join('')}
       </nav>

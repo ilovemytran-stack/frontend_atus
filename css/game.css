@@ -75,8 +75,11 @@
 .gl-notif-dot{ position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%; background:var(--gl-hp); border:1.5px solid var(--gl-bg); }
 
 .gl-joystick-zone{ position:absolute; left:0; bottom:0; width:42%; height:58%; z-index:15; }
-.gl-joystick-base{ position:absolute; left:26px; bottom:calc(env(safe-area-inset-bottom) + 22px); width:104px; height:104px; border-radius:50%; background:rgba(255,255,255,.06); border:2px solid var(--gl-gold-dim); }
-.gl-joystick-stick{ position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff6dc,var(--gl-gold-2) 70%); box-shadow:0 2px 8px rgba(0,0,0,.5); }
+.gl-joystick-base{ position:absolute; left:14px; bottom:calc(env(safe-area-inset-bottom) + 34px); width:150px; height:74px; border-radius:99px; background:rgba(255,255,255,.06); border:2px solid var(--gl-gold-dim); }
+.gl-joystick-base::before, .gl-joystick-base::after{ content:''; position:absolute; top:50%; width:0; height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; transform:translateY(-50%); opacity:.5; }
+.gl-joystick-base::before{ left:10px; border-right:9px solid var(--gl-gold); }
+.gl-joystick-base::after{ right:10px; border-left:9px solid var(--gl-gold); }
+.gl-joystick-stick{ position:absolute; left:50%; top:50%; width:54px; height:54px; margin:-27px 0 0 -27px; border-radius:50%; background:radial-gradient(circle at 35% 30%,#fff6dc,var(--gl-gold-2) 70%); box-shadow:0 2px 8px rgba(0,0,0,.5); }
 
 .gl-action-zone{ position:absolute; right:16px; bottom:calc(env(safe-area-inset-bottom) + 18px); z-index:15; display:flex; align-items:flex-end; gap:12px; }
 .gl-attack-btn{ width:82px; height:82px; border-radius:50%; border:3px solid var(--gl-gold); background:radial-gradient(circle at 35% 30%,#ff8f6b,#c23a2c 75%); color:#fff; font-family:var(--gl-font-display); font-weight:700; font-size:.85rem; letter-spacing:.05em; box-shadow:0 4px 14px rgba(194,58,44,.5); }

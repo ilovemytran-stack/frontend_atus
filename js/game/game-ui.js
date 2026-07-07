@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (res?.success) {
           GL.char = res.character;
           if (res.effect?.hp) { GL.player.hp = Math.min(GL.currentStats().hp, GL.player.hp + GL.currentStats().hp * res.effect.hp); GL.updateVitalsUI(); }
+          if (res.effect?.ki) { GL.player.ki = Math.min(GL.currentStats().ki, (GL.player.ki ?? GL.currentStats().ki) + GL.currentStats().ki * res.effect.ki); GL.updateVitalsUI(); }
           Toast.success('Đã dùng vật phẩm');
           renderInventoryPanel('bag');
         }
@@ -200,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('glBtnMap').addEventListener('click', () => { renderMapPanel(); openPanel('glPanelMap'); });
 
   // ---------- Thông báo ----------
-  document.getElementById('glBtnNotif').addEventListener('click', () => { renderNotifPanel(); openPanel('glPanelNotif'); });
+  document.getElementById('glBtnNotif').addEventListener('click', () => { GL.requestBossStatus(); renderNotifPanel(); openPanel('glPanelNotif'); });
 
   // ---------- Chat ----------
   document.getElementById('glChatToggle').addEventListener('click', () => {
@@ -256,6 +257,12 @@ function renderNotifPanel() {
   const mails = (GL.char.mailbox || []).filter((m) => !m.claimed);
   const duels = (GL.char.godDuels || []).filter((d) => d.status === 'pending');
   let html = '';
+  if (GL.lastBossStatus?.active) {
+    html += `<div style="padding:10px 12px;margin-bottom:10px;border:1px solid rgba(232,92,76,.4);border-radius:10px;background:rgba(232,92,76,.08)">
+      👑 <b>Boss Thế Giới</b> đang ở <b>${GL.lastBossStatus.continentName} · ${GL.lastBossStatus.mapName}</b> (khu ${GL.lastBossStatus.zone})<br>
+      <span style="color:var(--gl-text-dim);font-size:.65rem">Dạng ${GL.lastBossStatus.form}/5 · ${Math.round(GL.lastBossStatus.hp)}/${GL.lastBossStatus.maxHp} HP</span>
+    </div>`;
+  }
   if (duels.length) {
     html += `<div style="color:var(--gl-gold);font-size:.7rem;font-weight:700;margin-bottom:6px">⚔️ THÁCH ĐẤU THẦN LINH</div>`;
     html += duels.map((d) => `<div class="gl-row"><span>Thư thách đấu từ <b>${d.godName}</b><br><span style="color:var(--gl-text-dim);font-size:.65rem">Mở khoá ở cấp ${d.tier * 10} · Thua không mất gì</span></span><button class="gl-btn-sm" data-duel="${d.tier}">Chiến đấu</button></div>`).join('');

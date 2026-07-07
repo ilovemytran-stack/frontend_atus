@@ -117,16 +117,16 @@ function loop(ts) {
 }
 
 function updatePlayerMovement(dt) {
-  const { dx, dy } = GL.input;
+  const { dx } = GL.input; // chỉ dùng trục ngang — mô hình cuộn ngang như Ngọc Rồng Online
   const stats = GL.currentStats();
   const speed = 95 + stats.spd * 14;
-  const moving = Math.hypot(dx, dy) > 0.05;
+  const moving = Math.abs(dx) > 0.05;
+  GL.player.y = GL.GROUND_Y; // luôn đứng trên đường ground, không roaming tự do nữa
   if (!GL.autoAttackTarget) {
     GL.player.moving = moving;
     if (moving) {
       GL.player.dir = dx >= 0 ? 1 : -1;
-      GL.player.x = clamp(GL.player.x + dx * speed * dt, 30, GL.WORLD.w - 30);
-      GL.player.y = clamp(GL.player.y + dy * speed * dt, 30, GL.WORLD.h - 30);
+      GL.player.x = clamp(GL.player.x + dx * speed * dt, GL.WORLD.pad, GL.WORLD.w - GL.WORLD.pad);
     }
   }
   GL.player.attackCooldown = Math.max(0, (GL.player.attackCooldown || 0) - dt);
@@ -134,9 +134,9 @@ function updatePlayerMovement(dt) {
   GL.player.skillCd[0] = Math.max(0, GL.player.skillCd[0] - dt);
   GL.player.skillCd[1] = Math.max(0, GL.player.skillCd[1] - dt);
 
-  // hồi Ki theo thời gian (2.5/giây), chỉ cập nhật UI khi có thay đổi đáng kể để đỡ tốn
+  // hồi Ki theo thời gian, chỉ cập nhật UI khi có thay đổi đáng kể để đỡ tốn
   if (GL.player.ki != null && GL.player.ki < stats.ki) {
-    GL.player.ki = Math.min(stats.ki, GL.player.ki + 2.5 * dt);
+    GL.player.ki = Math.min(stats.ki, GL.player.ki + 5 * dt);
     kiUiAccum += dt;
     if (kiUiAccum > 0.2) { kiUiAccum = 0; GL.updateVitalsUI(); }
   }
@@ -146,7 +146,8 @@ let kiUiAccum = 0;
 function updateCamera() {
   const vw = window.innerWidth, vh = window.innerHeight;
   GL.camera.x = clamp(GL.player.x - vw / 2, 0, Math.max(0, GL.WORLD.w - vw));
-  GL.camera.y = clamp(GL.player.y - vh / 2, 0, Math.max(0, GL.WORLD.h - vh));
+  // Camera Y CỐ ĐỊNH — chỉ trượt ngang, không cuộn dọc (đúng kiểu Ngọc Rồng Online)
+  GL.camera.y = GL.GROUND_Y - vh * 0.62;
 }
 
 // ---------- Boot ----------

@@ -11,12 +11,11 @@ GL.initControls = function () {
   const maxR = 40;
 
   function setStick(dx, dy) {
-    const len = Math.hypot(dx, dy);
-    const clamped = Math.min(len, maxR);
-    const ang = Math.atan2(dy, dx);
-    stick.style.transform = `translate(${Math.cos(ang) * clamped}px,${Math.sin(ang) * clamped}px)`;
-    if (len < 8) { GL.input.dx = 0; GL.input.dy = 0; }
-    else { GL.input.dx = Math.cos(ang); GL.input.dy = Math.sin(ang); }
+    const clamped = Math.max(-maxR, Math.min(maxR, dx)); // CHỈ trượt ngang — đúng mô hình cuộn ngang 1 trục
+    stick.style.transform = `translate(${clamped}px, 0px)`;
+    if (Math.abs(dx) < 8) { GL.input.dx = 0; }
+    else { GL.input.dx = Math.max(-1, Math.min(1, dx / maxR)); }
+    GL.input.dy = 0;
   }
   function reset() { stick.style.transform = ''; GL.input.dx = 0; GL.input.dy = 0; activeId = null; }
   function handleMove(e) {
@@ -198,13 +197,13 @@ GL.clearTarget = function () {
 GL.updateAutoAttackTick = function (dt) {
   const t = GL.autoAttackTarget;
   if (!t || !t.alive) { GL.autoAttackTarget = null; return; }
-  const d = GL.dist(t, GL.player);
-  if (d > 55) {
-    const ang = Math.atan2(t.y - GL.player.y, t.x - GL.player.x);
+  const d = GL.distX(t, GL.player);
+  if (d > 50) {
+    const dirX = t.x >= GL.player.x ? 1 : -1;
     const stats = GL.currentStats();
     const speed = 95 + stats.spd * 14;
-    GL.player.x += Math.cos(ang) * speed * dt; GL.player.y += Math.sin(ang) * speed * dt;
-    GL.player.dir = Math.cos(ang) >= 0 ? 1 : -1; GL.player.moving = true;
+    GL.player.x = clamp(GL.player.x + dirX * speed * dt, GL.WORLD.pad, GL.WORLD.w - GL.WORLD.pad);
+    GL.player.dir = dirX; GL.player.moving = true;
   } else {
     GL.player.moving = false;
     GL.tryAttack();

@@ -1,12 +1,50 @@
 // ============================================================================
-// Render: canvas 2D, không phụ thuộc sprite cắt sẵn — vẽ nhân vật bằng vector
-// để hoạt ảnh mượt (đi/đứng/đánh) dựa trên silhouette + màu class/quái.
+// Render: canvas 2D — thân nhân vật vẫn vẽ bằng vector để hoạt ảnh mượt
+// (đi/đứng/đánh) dựa trên silhouette + màu class/quái, KHÔNG cần khung hình
+// animation cắt sẵn. Phía trên đầu mỗi nhân vật (người chơi/người chơi khác)
+// giờ có thêm avatar tròn dùng ẢNH THẬT từ bản vẽ Character (portrait), crop
+// tự động vào khung tròn — xem drawAvatarChip().
 // ============================================================================
 let ctx, canvas, DPR = 1;
 
 // ---------- Prop trang trí theo TỪNG MAP (ảnh PNG nền trong suốt thật, cắt từ bản vẽ riêng mỗi map) ----------
 const propImageCache = {};
 const propPlacements = {};
+
+// ---------- Avatar tròn nhân vật (ảnh PORTRAIT thật từ bản vẽ Character, đè lên trên thân vector) ----------
+const classPortraitCache = {};
+function getClassPortrait(cls) {
+  if (!cls || !cls.portrait) return null;
+  let img = classPortraitCache[cls.id];
+  if (!img) {
+    img = new Image();
+    img.src = cls.portrait;
+    classPortraitCache[cls.id] = img;
+  }
+  return img;
+}
+
+// Vẽ avatar tròn (ảnh thật) tại (sx,sy) với viền màu class — dùng clip hình tròn nên
+// không cần ảnh nền trong suốt, ảnh vuông/chữ nhật nào cũng crop gọn vào khung tròn.
+function drawAvatarChip(sx, sy, cls, radiusPx) {
+  if (!cls) return false;
+  const img = getClassPortrait(cls);
+  const r = radiusPx * DPR;
+  if (img && img.complete && img.naturalWidth) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+    // crop trung tâm ảnh theo hình vuông trước khi vẽ tròn, tránh méo tỉ lệ
+    const iw = img.naturalWidth, ih = img.naturalHeight, side = Math.min(iw, ih);
+    const sx0 = (iw - side) / 2, sy0 = (ih - side) / 2;
+    ctx.drawImage(img, sx0, sy0, side, side, sx - r, sy - r, r * 2, r * 2);
+    ctx.restore();
+  } else {
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fillStyle = '#1a1826'; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = cls.color || '#F5D061'; ctx.lineWidth = 1.6 * DPR; ctx.stroke();
+  return true;
+}
 
 function hashSeed(str) {
   let h = 1779033703;
@@ -30,18 +68,18 @@ function loadMapProps(map) {
   let seed = hashSeed(map.id);
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed % 1000) / 1000; };
   const isHub = map.role === 'hub';
-  const zoneLeft = isHub ? 460 : 80; // map hub né khu NPC bên trái, map khác dùng toàn bộ chiều rộng
+  const npcZoneEnd = isHub ? 760 : 140; // né đúng dải NPC (x:180-660) khi là map hub
   const placements = [];
-  const propTotal = isHub ? Math.min(14, count) : Math.min(24, count); // hub thoáng hơn (còn chỗ cho NPC), map khác rậm rạp hơn
+  const propTotal = Math.min(isHub ? 16 : 26, count);
   for (let i = 0; i < propTotal; i++) {
     placements.push({
       imgIdx: Math.floor(rnd() * count),
-      x: zoneLeft + rnd() * (GL.WORLD.w - zoneLeft - 60),
-      y: 60 + rnd() * (GL.WORLD.h - 120),
-      scale: 0.5 + rnd() * 0.6,
+      x: npcZoneEnd + rnd() * (GL.WORLD.w - npcZoneEnd - 80),
+      y: GL.GROUND_Y + (rnd() - 0.5) * 16, // đứng sát đường ground, rung nhẹ cho tự nhiên
+      scale: 0.45 + rnd() * 0.55,
     });
   }
-  placements.sort((a, b) => a.y - b.y); // vẽ theo chiều sâu (y nhỏ vẽ trước)
+  placements.sort((a, b) => a.x - b.x);
   propPlacements[map.id] = placements;
 }
 
@@ -89,27 +127,42 @@ function groundColorFor(continent) {
 
 function drawGround() {
   const [c1, c2] = groundColorFor(GL.continent?.id);
-  ctx.fillStyle = c1;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  // lưới điểm trang trí song song thị sai camera (không cần ảnh nền)
-  ctx.save();
-  ctx.translate(-GL.camera.x * DPR, -GL.camera.y * DPR);
-  ctx.globalAlpha = 0.5;
-  const spacing = 64 * DPR;
-  const offX = ((GL.camera.x * DPR) % spacing);
-  const offY = ((GL.camera.y * DPR) % spacing);
+  const groundScreenY = (GL.GROUND_Y - GL.camera.y) * DPR;
+
+  // bầu trời/nền phía trên đường ground — gradient nhẹ theo màu lục địa
+  const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY + 40 * DPR);
+  sky.addColorStop(0, c1);
+  sky.addColorStop(1, c2);
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, Math.max(0, groundScreenY + 40 * DPR));
+
+  // dải đất phía dưới đường ground
   ctx.fillStyle = c2;
-  for (let x = -spacing; x < GL.WORLD.w * DPR + spacing; x += spacing) {
-    for (let y = -spacing; y < GL.WORLD.h * DPR + spacing; y += spacing) {
-      ctx.beginPath(); ctx.arc(x + GL.camera.x * DPR, y + GL.camera.y * DPR, 2.2 * DPR, 0, 7); ctx.fill();
-    }
+  ctx.fillRect(0, groundScreenY + 30 * DPR, canvas.width, canvas.height);
+  // viền/đường chân trời sáng nhẹ đánh dấu mặt đất
+  ctx.strokeStyle = 'rgba(245,208,97,.35)'; ctx.lineWidth = 2 * DPR;
+  ctx.beginPath(); ctx.moveTo(0, groundScreenY + 30 * DPR); ctx.lineTo(canvas.width, groundScreenY + 30 * DPR); ctx.stroke();
+
+  // chấm trang trí dọc dải đất (thay lưới 2D cũ), trôi theo camera cho có chiều sâu
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  const spacing = 70 * DPR;
+  const offX = (-GL.camera.x * DPR) % spacing;
+  for (let x = offX - spacing; x < canvas.width + spacing; x += spacing) {
+    ctx.beginPath(); ctx.arc(x, groundScreenY + 50 * DPR, 1.6 * DPR, 0, 7); ctx.fill();
   }
   ctx.globalAlpha = 1;
-  // viền thế giới
-  ctx.strokeStyle = 'rgba(245,208,97,.25)'; ctx.lineWidth = 4 * DPR;
-  ctx.strokeRect(0, 0, GL.WORLD.w * DPR, GL.WORLD.h * DPR);
-  ctx.restore();
+
+  // biên trái/phải của hành lang (báo hiệu ranh giới map)
+  [0, GL.WORLD.w].forEach((edgeX) => {
+    const { sx } = worldToScreenPt(edgeX);
+    if (sx > -20 && sx < canvas.width + 20) {
+      ctx.strokeStyle = 'rgba(245,208,97,.4)'; ctx.lineWidth = 3 * DPR;
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height); ctx.stroke();
+    }
+  });
 }
+function worldToScreenPt(x) { return { sx: (x - GL.camera.x) * DPR }; }
 
 function worldToScreen(x, y) { return { sx: (x - GL.camera.x) * DPR, sy: (y - GL.camera.y) * DPR }; }
 
@@ -245,6 +298,7 @@ GL.renderFrame = function (t) {
     const { sx, sy } = worldToScreen(r.x, r.y);
     const cls = GL.classById(r.classId);
     drawHumanoid(sx, sy, { color: cls?.color || '#8888ff', dir: r.dir || 1, moving: r.moving, t, weaponType: cls?.weaponType });
+    drawAvatarChip(sx, sy - 48 * DPR, cls, 11);
     ctx.fillStyle = '#cfd6ff'; ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
     ctx.fillText(`${r.name} Lv.${r.level || 1}`, sx, sy - 34 * DPR);
   });
@@ -255,6 +309,7 @@ GL.renderFrame = function (t) {
   const p = GL.player, { sx, sy } = worldToScreen(p.x, p.y);
   const cls = GL.classById(GL.char.classId);
   drawHumanoid(sx, sy, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
+  drawAvatarChip(sx, sy - 48 * DPR, cls, 12);
   ctx.fillStyle = '#fff'; ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
   ctx.fillText(GL.char.name, sx, sy - 34 * DPR);
 

@@ -1,41 +1,37 @@
 // ============================================================================
 // Thực thể trong game: quái, NPC, va chạm, sát thương
+// Mô hình CUỘN NGANG (như Ngọc Rồng Online): thế giới là 1 dải ngang dài,
+// mọi thực thể di chuyển trái/phải trên cùng 1 đường ground (GROUND_Y).
 // ============================================================================
-GL.WORLD = { w: 2000, h: 1150, pad: 120 };
+GL.WORLD = { w: 3200, h: 220, pad: 100 };
+GL.GROUND_Y = 150; // đường "mặt đất" cố định — nhân vật/quái/NPC luôn đứng trên đường này
 
 GL.NPC_DEFS = [
-  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: '📜', x: 260, y: 300, kind: 'quest' },
-  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: '🌀', x: 340, y: 420, kind: 'portal' },
-  { id: 'npc_potion', name: 'Dược Sư', icon: '🧪', x: 200, y: 500, kind: 'potion' },
-  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: '⚔️', x: 420, y: 260, kind: 'weapon' },
-  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: '🛡️', x: 300, y: 180, kind: 'armor' },
+  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: '📜', x: 180, y: GL.GROUND_Y, kind: 'quest' },
+  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: '🌀', x: 300, y: GL.GROUND_Y, kind: 'portal' },
+  { id: 'npc_potion', name: 'Dược Sư', icon: '🧪', x: 420, y: GL.GROUND_Y, kind: 'potion' },
+  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: '⚔️', x: 540, y: GL.GROUND_Y, kind: 'weapon' },
+  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: '🛡️', x: 660, y: GL.GROUND_Y, kind: 'armor' },
 ];
 
-function jitteredGrid(count, bounds) {
-  const cols = Math.ceil(Math.sqrt(count));
-  const rows = Math.ceil(count / cols);
-  const cellW = (bounds.w - bounds.pad * 2) / cols;
-  const cellH = (bounds.h - bounds.pad * 2) / rows;
+// Rắc điểm dọc theo 1 đường ngang, cách đều + rung nhẹ (thay cho lưới 2D cũ)
+function jitteredLine(count, xStart, xEnd) {
+  const span = (xEnd - xStart) / count;
   const pts = [];
   for (let i = 0; i < count; i++) {
-    const cx = i % cols, cy = Math.floor(i / cols);
-    const jx = (Math.random() - 0.5) * cellW * 0.35;
-    const jy = (Math.random() - 0.5) * cellH * 0.35;
-    pts.push({
-      x: bounds.pad + cellW * (cx + 0.5) + jx,
-      y: bounds.pad + cellH * (cy + 0.5) + jy,
-    });
+    const jitter = (Math.random() - 0.5) * span * 0.4;
+    pts.push({ x: xStart + span * (i + 0.5) + jitter, y: GL.GROUND_Y + (Math.random() - 0.5) * 14 });
   }
   return pts;
 }
 
-// point 4/5: tối đa 10 quái mỗi map, mỗi con cách nhau 1 đoạn
+// point 4/5: tối đa 10 quái mỗi map, mỗi con cách nhau 1 đoạn (dọc theo đường ngang)
 GL.spawnMonsters = function (map) {
   const list = [];
   if (!map.monsterIds.length) { GL.monsters = list; return list; }
   const count = Math.min(map.maxMonsters || 10, 10);
-  const spawnZone = { w: GL.WORLD.w - 420, h: GL.WORLD.h, pad: 90 }; // né khu NPC bên trái
-  const pts = jitteredGrid(count, spawnZone).map((p) => ({ x: p.x + 420, y: p.y }));
+  const npcZoneEnd = map.role === 'hub' ? 760 : 200; // né khu NPC nếu là map hub
+  const pts = jitteredLine(count, npcZoneEnd, GL.WORLD.w - 100);
   const lvl = map.levelRange[1];
   pts.forEach((p, i) => {
     let monsterId = map.monsterIds[i % map.monsterIds.length];
@@ -70,6 +66,8 @@ function GLScaleMonster(def, mapLevel, isBoss, isMixTier) {
 }
 
 GL.dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// khoảng cách "thật" cho gameplay cuộn ngang: chỉ tính theo trục X (nhân vật/quái luôn ở ground Y)
+GL.distX = (a, b) => Math.abs(a.x - b.x);
 
 GL.rollDamage = (atk, def, critChance) => {
   const base = Math.max(1, atk - def * 0.5);
@@ -82,7 +80,7 @@ GL.spawnDamageNumber = function (worldX, worldY, text, cls) {
   GL.fx.push({ x: worldX, y: worldY, text, cls, life: 0.8, t: 0 });
 };
 
-// cập nhật AI quái mỗi frame (dt = giây) — nhắm vào mục tiêu gần nhất: người chơi HOẶC thú triệu hồi
+// cập nhật AI quái mỗi frame (dt = giây) — nhắm vào mục tiêu gần nhất theo trục ngang: người chơi HOẶC thú triệu hồi
 GL.updateMonsters = function (dt, now) {
   const p = GL.player;
   GL.monsters.forEach((m) => {
@@ -92,18 +90,18 @@ GL.updateMonsters = function (dt, now) {
       }
       return;
     }
-    let target = p, bestD = GL.dist(m, p);
-    (GL.summons || []).forEach((s) => { if (!s.alive) return; const d = GL.dist(m, s); if (d < bestD) { target = s; bestD = d; } });
+    let target = p, bestD = GL.distX(m, p);
+    (GL.summons || []).forEach((s) => { if (!s.alive) return; const d = GL.distX(m, s); if (d < bestD) { target = s; bestD = d; } });
 
     if (m.state !== 'attack') {
       if (bestD < 150) {
         m.state = 'chase';
-        const ang = Math.atan2(target.y - m.y, target.x - m.x);
+        const dirX = target.x >= m.x ? 1 : -1;
         const spd = m.isBoss ? 55 : 70;
-        if (bestD > 34) { m.x += Math.cos(ang) * spd * dt; m.y += Math.sin(ang) * spd * dt; m.dir = Math.cos(ang) >= 0 ? 1 : -1; }
+        if (bestD > 34) { m.x += dirX * spd * dt; m.dir = dirX; }
       } else if (bestD > 220) {
-        const ang = Math.atan2(m.homeY - m.y, m.homeX - m.x);
-        if (GL.dist(m, { x: m.homeX, y: m.homeY }) > 6) { m.x += Math.cos(ang) * 40 * dt; m.y += Math.sin(ang) * 40 * dt; }
+        const dirX = m.homeX >= m.x ? 1 : -1;
+        if (Math.abs(m.x - m.homeX) > 6) { m.x += dirX * 40 * dt; }
         m.state = 'idle';
       }
     }
@@ -130,7 +128,7 @@ GL.spawnSummon = function (defId, skillId, duration) {
   const defStat = Math.round(stats.def * def.defPct + lv * def.defPerLv);
   GL.summons.push({
     uid: 's' + Date.now() + Math.random(), defId, def,
-    x: GL.player.x + 34, y: GL.player.y, dir: 1,
+    x: GL.player.x + 34, y: GL.GROUND_Y, dir: 1,
     hp, maxHp: hp, atk, def: defStat, speed: def.speed,
     expiresAt: performance.now() + duration * 1000, state: 'idle', attackTimer: 0, alive: true,
   });
@@ -145,20 +143,20 @@ GL.updateSummons = function (dt, now) {
   GL.summons = GL.summons.filter((s) => s.alive && now < s.expiresAt);
   GL.summons.forEach((s) => {
     let target = null, bestD = 260;
-    GL.monsters.forEach((m) => { if (!m.alive) return; const d = GL.dist(m, s); if (d < bestD) { target = m; bestD = d; } });
+    GL.monsters.forEach((m) => { if (!m.alive) return; const d = GL.distX(m, s); if (d < bestD) { target = m; bestD = d; } });
     if (target) {
       if (bestD > 36) {
-        const ang = Math.atan2(target.y - s.y, target.x - s.x);
-        s.x += Math.cos(ang) * s.speed * dt; s.y += Math.sin(ang) * s.speed * dt; s.dir = Math.cos(ang) >= 0 ? 1 : -1; s.state = 'chase';
+        const dirX = target.x >= s.x ? 1 : -1;
+        s.x += dirX * s.speed * dt; s.dir = dirX; s.state = 'chase';
       } else {
         s.state = 'attack'; s.attackTimer -= dt;
         if (s.attackTimer <= 0) { s.attackTimer = 1.1; const dmgInfo = GL.rollDamage(s.atk, target.def, 5); GL.applyMonsterHit(target, dmgInfo); }
       }
     } else {
-      const d = GL.dist(s, GL.player);
+      const d = GL.distX(s, GL.player);
       if (d > 70) {
-        const ang = Math.atan2(GL.player.y - s.y, GL.player.x - s.x);
-        s.x += Math.cos(ang) * s.speed * dt; s.y += Math.sin(ang) * s.speed * dt; s.dir = Math.cos(ang) >= 0 ? 1 : -1; s.state = 'chase';
+        const dirX = GL.player.x >= s.x ? 1 : -1;
+        s.x += dirX * s.speed * dt; s.dir = dirX; s.state = 'chase';
       } else s.state = 'idle';
     }
   });

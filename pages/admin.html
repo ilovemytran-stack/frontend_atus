@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin Dashboard – Public</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Public">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/css/global.css">
 <link rel="stylesheet" href="/css/feed.css">
 <style>
@@ -56,6 +63,7 @@
     <div class="admin-tab active" data-tab="users">👥 Người dùng</div>
     <div class="admin-tab" data-tab="posts">📝 Bài viết</div>
     <div class="admin-tab" data-tab="videos">🎬 Video</div>
+    <div class="admin-tab" data-tab="gmgame">🎮 GM Game</div>
   </div>
 
   <div class="admin-toolbar">
@@ -91,6 +99,16 @@
       </table>
     </div>
     <div class="pagination" id="videosPagination"></div>
+  </div>
+
+  <div id="panel-gmgame" class="admin-panel" style="display:none">
+    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Công cụ GM để test game: tìm nhân vật theo tên, chỉnh cấp/tiền/buff sát thương, đánh dấu hoàn thành nhiệm vụ.</div>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Nhân vật</th><th>Tài khoản</th><th>Class</th><th>Cấp</th><th>Vàng/Ngọc</th><th>Buff Dame</th><th>Hành động</th></tr></thead>
+        <tbody id="gmCharsTbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 <div id="accessDenied" class="access-denied" style="display:none">
@@ -148,6 +166,7 @@ function loadTab(tab) {
   if (tab === 'users') return loadUsers();
   if (tab === 'posts') return loadPosts();
   if (tab === 'videos') return loadVideos();
+  if (tab === 'gmgame') return loadGmChars();
 }
 
 async function loadStats() {
@@ -288,6 +307,60 @@ async function deleteVideo(id) {
   const res = await API.delete(`/admin/videos/${id}`);
   if (res?.success) { Toast.success(res.message); loadVideos(); loadStats(); }
   else Toast.error(res?.message || 'Có lỗi xảy ra');
+}
+
+// ===== GM GAME (G.Legendary) =====
+async function loadGmChars() {
+  const res = await API.get(`/admin/game/characters?search=${encodeURIComponent(state.search)}`);
+  if (!res?.success) return;
+  document.getElementById('gmCharsTbody').innerHTML = res.characters.length ? res.characters.map(c => `
+    <tr>
+      <td><b>${esc(c.name)}</b></td>
+      <td>@${esc(c.user?.username || '?')}</td>
+      <td>${esc(c.classId)}</td>
+      <td>${c.level}</td>
+      <td>${(c.gold||0).toLocaleString()}🪙 / ${(c.gem||0).toLocaleString()}💎</td>
+      <td>${c.gmDamageMultiplier && c.gmDamageMultiplier !== 1 ? `x${c.gmDamageMultiplier}` : '—'}</td>
+      <td><div class="admin-actions">
+        <button class="btn btn-sm btn-secondary" onclick="gmSetLevel('${c._id}','${esc(c.name)}',${c.level})">Cấp</button>
+        <button class="btn btn-sm btn-secondary" onclick="gmCurrency('${c._id}','${esc(c.name)}')">Tiền</button>
+        <button class="btn btn-sm btn-secondary" onclick="gmDamageBuff('${c._id}','${esc(c.name)}',${c.gmDamageMultiplier||1})">Buff Dame</button>
+        <button class="btn btn-sm btn-secondary" onclick="gmCompleteQuests('${c._id}','${esc(c.name)}')">Xong NV</button>
+      </div></td>
+    </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">Không tìm thấy nhân vật nào — thử tìm theo tên</div></td></tr>`;
+}
+
+async function gmSetLevel(id, name, current) {
+  const input = prompt(`Đặt cấp độ mới cho ${name} (hiện tại: ${current}, tối đa 60):`, current);
+  if (input === null) return;
+  const level = Number(input);
+  if (!level || level < 1 || level > 60) { Toast.error('Cấp không hợp lệ (1-60)'); return; }
+  const res = await API.put(`/admin/game/characters/${id}/set-level`, { level });
+  if (res?.success) { Toast.success(res.message); loadGmChars(); } else Toast.error(res?.message || 'Lỗi');
+}
+
+async function gmCurrency(id, name) {
+  const gold = prompt(`Cộng bao nhiêu Vàng cho ${name}? (số âm để trừ, để trống = 0)`, '0');
+  if (gold === null) return;
+  const gem = prompt(`Cộng bao nhiêu Ngọc cho ${name}? (số âm để trừ, để trống = 0)`, '0');
+  if (gem === null) return;
+  const res = await API.put(`/admin/game/characters/${id}/currency`, { gold: Number(gold)||0, gem: Number(gem)||0 });
+  if (res?.success) { Toast.success(res.message); loadGmChars(); } else Toast.error(res?.message || 'Lỗi');
+}
+
+async function gmDamageBuff(id, name, current) {
+  const input = prompt(`Buff sát thương (x lần) cho ${name} — dùng để test (1 = bình thường, hiện tại: x${current}):`, current);
+  if (input === null) return;
+  const multiplier = Number(input);
+  if (!multiplier || multiplier <= 0) { Toast.error('Giá trị không hợp lệ'); return; }
+  const res = await API.put(`/admin/game/characters/${id}/damage-buff`, { multiplier });
+  if (res?.success) { Toast.success(res.message); loadGmChars(); } else Toast.error(res?.message || 'Lỗi');
+}
+
+async function gmCompleteQuests(id, name) {
+  if (!confirm(`Đánh dấu hoàn thành nhiệm vụ hiện tại cho ${name}?`)) return;
+  const res = await API.put(`/admin/game/characters/${id}/complete-quests`, {});
+  if (res?.success) Toast.success(res.message); else Toast.error(res?.message || 'Lỗi');
 }
 
 checkAccessAndInit();

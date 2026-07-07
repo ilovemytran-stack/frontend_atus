@@ -38,6 +38,21 @@ GL.initWorldEventsSocket = function () {
   GL.socket.on('boss_kill_reward', ({ vipCoin, drops }) => {
     GL.toast(`Phần thưởng: +${vipCoin} Xu VIP, +1 Đá Nâng Cấp${drops.length ? ', +' + drops.length + ' trang bị đặc biệt!' : ''}`);
   });
+
+  // Thông báo boss TOÀN SERVER — biết cả khi không đứng đúng map
+  GL.socket.on('world_boss_alert', (info) => {
+    if (info.type === 'spawned') {
+      GL.lastBossAlert = info;
+      GL.toast(`👑 Boss Thế Giới xuất hiện tại ${info.continentName} · ${info.mapName}!`, 'gl-toast-levelup');
+      document.getElementById('glNotifDot').style.display = 'block';
+    } else {
+      GL.lastBossAlert = null;
+    }
+  });
+  GL.socket.on('world_boss_status', (status) => {
+    GL.lastBossStatus = status;
+    if (document.getElementById('glPanelNotif').style.display === 'flex') renderNotifPanel();
+  });
 };
 
 // Gọi khi vào map để đồng bộ trạng thái thần/boss đang có sẵn (nếu server đã spawn từ trước khi mình vào)
@@ -46,13 +61,18 @@ GL.requestWorldState = function (mapId, zone) {
   GL.socketEmit('world_state_request', { mapId, zone });
 };
 
-// Boss/Thần đứng cố định tại 1 điểm nổi bật trên map (server chỉ đồng bộ chỉ số, không đồng bộ toạ độ)
-GL.BOSS_SPOT = { x: 1550, y: 460 };
-GL.GOD_SPOT = { x: 1550, y: 260 };
+GL.lastBossAlert = null;
+GL.requestBossStatus = function () {
+  GL.socketEmit('world_boss_status_request', {});
+};
+
+// Boss/Thần đứng cố định tại 1 điểm nổi bật trên map, trên cùng đường ground (mô hình cuộn ngang)
+GL.BOSS_SPOT = { x: 2200, y: GL.GROUND_Y };
+GL.GOD_SPOT = { x: 1900, y: GL.GROUND_Y };
 
 // Mục tiêu boss thế giới được ưu tiên hơn quái thường khi trong tầm đánh
 GL.nearestBossTarget = function (range) {
   if (!GL.worldBoss) return null;
-  const d = GL.dist(GL.BOSS_SPOT, GL.player);
+  const d = GL.distX(GL.BOSS_SPOT, GL.player);
   return d < range * 2.2 ? GL.worldBoss : null; // phạm vi rộng hơn quái thường vì boss là mục tiêu lớn
 };

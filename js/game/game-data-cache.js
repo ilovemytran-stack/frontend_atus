@@ -17,6 +17,7 @@ window.GL = {
   camera: { x: 0, y: 0 },
   keys: {},
 };
+// GL.WORLD và GL.GROUND_Y được định nghĩa trong game-entities.js (mô hình hành lang ngang)
 
 GL.fetchGameData = async function () {
   const res = await API.get('/game/data');
