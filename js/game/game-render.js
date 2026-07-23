@@ -11,38 +11,74 @@ let ctx, canvas, DPR = 1;
 const propImageCache = {};
 const propPlacements = {};
 
-// ---------- Avatar tròn nhân vật (ảnh PORTRAIT thật từ bản vẽ Character, đè lên trên thân vector) ----------
-const classPortraitCache = {};
-function getClassPortrait(cls) {
-  if (!cls || !cls.portrait) return null;
-  let img = classPortraitCache[cls.id];
+// ---------- Avatar tròn (ảnh PORTRAIT thật, đè lên trên thân vector) ----------
+const portraitImgCache = {};
+function getPortraitImg(url) {
+  if (!url) return null;
+  let img = portraitImgCache[url];
   if (!img) {
     img = new Image();
-    img.src = cls.portrait;
-    classPortraitCache[cls.id] = img;
+    img.src = url;
+    portraitImgCache[url] = img;
   }
   return img;
 }
+function getClassPortrait(cls) { return cls ? getPortraitImg(cls.portrait) : null; }
 
-// Vẽ avatar tròn (ảnh thật) tại (sx,sy) với viền màu class — dùng clip hình tròn nên
+// Vẽ avatar tròn (ảnh thật) tại (sx,sy) với viền màu — dùng clip hình tròn nên
 // không cần ảnh nền trong suốt, ảnh vuông/chữ nhật nào cũng crop gọn vào khung tròn.
-function drawAvatarChip(sx, sy, cls, radiusPx) {
-  if (!cls) return false;
-  const img = getClassPortrait(cls);
+function drawAvatarChip(sx, sy, imgUrlOrCls, radiusPx, ringColor) {
+  const cls = (imgUrlOrCls && typeof imgUrlOrCls === 'object') ? imgUrlOrCls : null;
+  const url = cls ? cls.portrait : imgUrlOrCls;
+  const ring = ringColor || (cls && cls.color) || '#F5D061';
+  if (!url) return false;
+  const img = getPortraitImg(url);
+  if (!img || !img.complete || !img.naturalWidth) return false; // chưa tải xong: để caller tự vẽ fallback (icon/emoji)
   const r = radiusPx * DPR;
-  if (img && img.complete && img.naturalWidth) {
-    ctx.save();
-    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
-    // crop trung tâm ảnh theo hình vuông trước khi vẽ tròn, tránh méo tỉ lệ
-    const iw = img.naturalWidth, ih = img.naturalHeight, side = Math.min(iw, ih);
-    const sx0 = (iw - side) / 2, sy0 = (ih - side) / 2;
-    ctx.drawImage(img, sx0, sy0, side, side, sx - r, sy - r, r * 2, r * 2);
-    ctx.restore();
-  } else {
-    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fillStyle = '#1a1826'; ctx.fill();
-  }
+  ctx.save();
+  ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+  // crop trung tâm ảnh theo hình vuông trước khi vẽ tròn, tránh méo tỉ lệ
+  const iw = img.naturalWidth, ih = img.naturalHeight, side = Math.min(iw, ih);
+  const sx0 = (iw - side) / 2, sy0 = (ih - side) / 2;
+  ctx.drawImage(img, sx0, sy0, side, side, sx - r, sy - r, r * 2, r * 2);
+  ctx.restore();
   ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2);
-  ctx.strokeStyle = cls.color || '#F5D061'; ctx.lineWidth = 1.6 * DPR; ctx.stroke();
+  ctx.strokeStyle = ring; ctx.lineWidth = 1.6 * DPR; ctx.stroke();
+  return true;
+}
+
+// Vẽ NHÂN VẬT/QUÁI bằng ẢNH THẬT làm thân chính (không phải avatar tròn nhỏ nữa) — trả về
+// false nếu ảnh chưa sẵn sàng để nơi gọi tự vẽ vector dự phòng (drawHumanoid).
+function drawSprite(sx, sy, imgUrl, opts) {
+  const { dir = 1, moving = false, t = 0, heightPx = 74, isBoss = false } = opts || {};
+  if (!imgUrl) return false;
+  const img = getPortraitImg(imgUrl);
+  if (!img || !img.complete || !img.naturalWidth) return false;
+
+  const iw = img.naturalWidth, ih = img.naturalHeight, side = Math.min(iw, ih);
+  const sx0 = (iw - side) / 2, sy0 = (ih - side) / 2;
+  const h = heightPx * DPR * (isBoss ? 1.55 : 1);
+  const w = h;
+  const bob = (moving ? Math.sin(t * 9) * 2.6 : Math.sin(t * 2.2) * 1.1) * DPR;
+  const drawY = sy - h + 8 * DPR - bob;
+
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 3 * DPR, w * 0.3, 4.5 * DPR, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,.32)';
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(sx, 0);
+  ctx.scale(dir < 0 ? -1 : 1, 1);
+  roundRect(-w / 2, drawY, w, h, 12 * DPR);
+  ctx.save();
+  ctx.clip();
+  ctx.drawImage(img, sx0, sy0, side, side, -w / 2, drawY, w, h);
+  ctx.restore();
+  ctx.lineWidth = 1.4 * DPR;
+  ctx.strokeStyle = 'rgba(255,255,255,.18)';
+  ctx.stroke();
+  ctx.restore();
   return true;
 }
 
@@ -125,16 +161,46 @@ function groundColorFor(continent) {
   return map[continent] || ['#1a1a24', '#22222e'];
 }
 
+// ---------- Ảnh nền thật theo từng map (Map/lục địa/N.jpg) — parallax nhẹ khi cuộn ngang ----------
+const mapBgCache = {};
+function getMapBgImg(continentId, index) {
+  const key = `${continentId}_${index}`;
+  let img = mapBgCache[key];
+  if (!img) {
+    img = new Image();
+    img.src = `/assets/game/mapbg/${continentId}/${index}.jpg`;
+    mapBgCache[key] = img;
+  }
+  return img;
+}
+
 function drawGround() {
   const [c1, c2] = groundColorFor(GL.continent?.id);
   const groundScreenY = (GL.GROUND_Y - GL.camera.y) * DPR;
 
-  // bầu trời/nền phía trên đường ground — gradient nhẹ theo màu lục địa
+  // bầu trời/nền phía trên đường ground — gradient nhẹ theo màu lục địa (fallback khi chưa có/chưa tải ảnh)
   const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY + 40 * DPR);
   sky.addColorStop(0, c1);
   sky.addColorStop(1, c2);
   ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, canvas.width, Math.max(0, groundScreenY + 40 * DPR));
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const bg = GL.map ? getMapBgImg(GL.map.continentId, GL.map.index) : null;
+  if (bg && bg.complete && bg.naturalWidth) {
+    // scale ảnh phủ kín chiều cao canvas + dư ra 2 bên để có biên độ trôi (parallax), không cần lặp ảnh
+    const scale = Math.max((canvas.height / bg.naturalHeight) * 1.5, (canvas.width * 2.4) / bg.naturalWidth);
+    const dw = bg.naturalWidth * scale, dh = bg.naturalHeight * scale;
+    const parallax = 0.1; // nền trôi chậm hơn nhiều so với camera thật, tạo chiều sâu
+    const maxOffset = Math.max(0, dw - canvas.width);
+    const rawX = -GL.camera.x * DPR * parallax;
+    const clampedDx = maxOffset ? (((rawX % maxOffset) + maxOffset) % maxOffset) - maxOffset / 2 : 0;
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(bg, canvas.width / 2 - dw / 2 + clampedDx, groundScreenY * 0.55 - dh * 0.5, dw, dh);
+    ctx.globalAlpha = 1;
+    // lớp phủ mờ để chữ/nhân vật/HP bar phía trên vẫn rõ, không bị ảnh nền chọi màu
+    ctx.fillStyle = 'rgba(10,8,16,.28)';
+    ctx.fillRect(0, 0, canvas.width, Math.max(0, groundScreenY + 40 * DPR));
+  }
 
   // dải đất phía dưới đường ground
   ctx.fillStyle = c2;
@@ -233,34 +299,42 @@ function drawMonster(m, t) {
   const { sx, sy } = worldToScreen(m.x, m.y);
   if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) return;
   const shapeColor = m.def.color;
-  const scale = (m.isBoss ? 1.7 : 1) * (14 / 14);
-  drawHumanoid(sx, sy, { color: shapeColor, dir: m.dir, moving: m.state === 'chase', t, scale: m.isBoss ? 1.6 : 1, weaponType: m.def.shape === 'caster' ? 'staff' : (m.def.shape === 'archer' ? 'dagger' : 'sword') });
-  drawHpBar(sx, sy - (m.isBoss ? 52 : 34) * DPR, m.isBoss ? 60 : 34, m.hp / m.maxHp, '#E85C4C');
+  const spriteUrl = `/assets/game/${m.isBoss ? 'bosses' : 'monsters'}/${m.defId}.png`;
+  const gotSprite = drawSprite(sx, sy, spriteUrl, { dir: m.dir, moving: m.state === 'chase', t, heightPx: m.isBoss ? 70 : 52, isBoss: m.isBoss });
+  if (!gotSprite) {
+    drawHumanoid(sx, sy, { color: shapeColor, dir: m.dir, moving: m.state === 'chase', t, scale: m.isBoss ? 1.6 : 1, weaponType: m.def.shape === 'caster' ? 'staff' : (m.def.shape === 'archer' ? 'dagger' : 'sword') });
+  }
+  const topOff = gotSprite ? (m.isBoss ? 108 : 76) : (m.isBoss ? 78 : 52);
+  drawHpBar(sx, sy - topOff * DPR, m.isBoss ? 60 : 34, m.hp / m.maxHp, '#E85C4C');
   ctx.fillStyle = m.isBoss ? '#F5B84C' : '#e8e2d0';
   ctx.font = `${(m.isBoss ? 12 : 10) * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
-  ctx.fillText((m.isBoss ? '★ ' : '') + m.def.nameVN, sx, sy - (m.isBoss ? 60 : 42) * DPR);
+  ctx.fillText((m.isBoss ? '★ ' : '') + m.def.nameVN, sx, sy - (topOff - 18) * DPR);
 }
 
 function drawSummon(s, t) {
   if (!s.alive) return;
   const { sx, sy } = worldToScreen(s.x, s.y);
-  drawHumanoid(sx, sy, { color: s.def.color, dir: s.dir, moving: s.state === 'chase', t, attacking: s.state === 'attack', weaponType: s.def.weaponType });
-  drawHpBar(sx, sy - 34 * DPR, 30, s.hp / s.maxHp, '#5CE8A0');
+  const gotSprite = drawSprite(sx, sy, s.def.portrait, { dir: s.dir, moving: s.state === 'chase', t, heightPx: 60 });
+  if (!gotSprite) drawHumanoid(sx, sy, { color: s.def.color, dir: s.dir, moving: s.state === 'chase', t, attacking: s.state === 'attack', weaponType: s.def.weaponType });
+  drawHpBar(sx, sy - (gotSprite ? 78 : 34) * DPR, 30, s.hp / s.maxHp, '#5CE8A0');
   ctx.fillStyle = '#9CFFD0'; ctx.font = `${9 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
-  ctx.fillText(s.def.nameVN, sx, sy - 42 * DPR);
+  ctx.fillText(s.def.nameVN, sx, sy - (gotSprite ? 86 : 42) * DPR);
 }
 
 function drawNpc(npc) {
   const { sx, sy } = worldToScreen(npc.x, npc.y);
-  ctx.save(); ctx.translate(sx, sy);
-  ctx.beginPath(); ctx.arc(0, 0, 16 * DPR, 0, 7);
-  ctx.fillStyle = 'rgba(245,208,97,.16)'; ctx.fill();
-  ctx.strokeStyle = '#F5D061'; ctx.lineWidth = 2 * DPR; ctx.stroke();
-  ctx.font = `${16 * DPR}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(npc.icon, 0, 1);
-  ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.fillStyle = '#F5D061';
-  ctx.fillText(npc.name, 0, -26 * DPR);
-  ctx.restore();
+  const gotSprite = drawSprite(sx, sy, `/assets/game/npc/${GL.map?.continentId || 'aurelion'}/${npc.id}.png`, { dir: 1, moving: false, t: performance.now() / 1000, heightPx: 58 });
+  if (!gotSprite) {
+    ctx.save(); ctx.translate(sx, sy);
+    ctx.beginPath(); ctx.arc(0, 0, 16 * DPR, 0, 7);
+    ctx.fillStyle = 'rgba(245,208,97,.16)'; ctx.fill();
+    ctx.strokeStyle = '#F5D061'; ctx.lineWidth = 2 * DPR; ctx.stroke();
+    ctx.font = `${16 * DPR}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(npc.icon, 0, 1);
+    ctx.restore();
+  }
+  ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.fillStyle = '#F5D061'; ctx.textAlign = 'center';
+  ctx.fillText(npc.name, sx, sy - (gotSprite ? 66 : 26) * DPR);
 }
 
 function drawWorldBossAndGod() {
@@ -268,21 +342,25 @@ function drawWorldBossAndGod() {
     const { sx, sy } = worldToScreen(GL.GOD_SPOT.x, GL.GOD_SPOT.y);
     ctx.save(); ctx.shadowColor = GL.worldGod.color; ctx.shadowBlur = 20 * DPR;
     ctx.beginPath(); ctx.arc(sx, sy, 26 * DPR, 0, 7);
-    ctx.fillStyle = GL.worldGod.color; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = GL.worldGod.color; ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1;
     ctx.restore();
-    ctx.font = `${13 * DPR}px serif`; ctx.textAlign = 'center'; ctx.fillText('🙏', sx, sy + 5 * DPR);
-    ctx.fillStyle = '#fff'; ctx.font = `${11 * DPR}px Cinzel, serif`;
-    ctx.fillText(GL.worldGod.name, sx, sy - 38 * DPR);
-    drawHpBar(sx, sy - 30 * DPR, 50, GL.worldGod.hp / GL.worldGod.maxHp, GL.worldGod.color);
+    const gotArt = drawSprite(sx, sy, `/assets/game/gods/${GL.worldGod.continentId || GL.map?.continentId}.png`, { dir: 1, moving: false, t: performance.now() / 1000, heightPx: 78 });
+    if (!gotArt) { ctx.font = `${13 * DPR}px serif`; ctx.textAlign = 'center'; ctx.fillText('🙏', sx, sy + 5 * DPR); }
+    ctx.fillStyle = '#fff'; ctx.font = `${11 * DPR}px Cinzel, serif`; ctx.textAlign = 'center';
+    ctx.fillText(GL.worldGod.name, sx, sy - (gotArt ? 92 : 38) * DPR);
+    drawHpBar(sx, sy - (gotArt ? 84 : 30) * DPR, 50, GL.worldGod.hp / GL.worldGod.maxHp, GL.worldGod.color);
   }
   if (GL.worldBoss) {
     const { sx, sy } = worldToScreen(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y);
+    // Boss Thế Giới = Chaoseraph (Thần Hỗn Mang), đổi tạo hình theo Dạng 1-5 khi càng mất máu càng biến hình mạnh hơn
+    const chaosArt = `chaoseraph_${GL.worldBoss.form}`;
     ctx.save(); ctx.shadowColor = '#E85C4C'; ctx.shadowBlur = 26 * DPR;
-    drawHumanoid(sx, sy, { color: '#8A1F1F', dir: -1, moving: false, t: performance.now() / 1000, scale: 2.1, weaponType: 'sword' });
+    const gotBoss = drawSprite(sx, sy, `/assets/game/bosses/${chaosArt}.png`, { dir: -1, moving: true, t: performance.now() / 1000, heightPx: 92, isBoss: true });
+    if (!gotBoss) drawHumanoid(sx, sy, { color: '#8A1F1F', dir: -1, moving: false, t: performance.now() / 1000, scale: 2.1, weaponType: 'sword' });
     ctx.restore();
     ctx.fillStyle = '#F5B84C'; ctx.font = `${13 * DPR}px Cinzel, serif`; ctx.textAlign = 'center';
-    ctx.fillText(`👑 BOSS THẾ GIỚI · Dạng ${GL.worldBoss.form}/5`, sx, sy - 74 * DPR);
-    drawHpBar(sx, sy - 64 * DPR, 90, GL.worldBoss.hp / GL.worldBoss.maxHp, '#E85C4C');
+    ctx.fillText(`👑 CHAOSERAPH · Dạng ${GL.worldBoss.form}/5`, sx, sy - (gotBoss ? 158 : 74) * DPR);
+    drawHpBar(sx, sy - (gotBoss ? 148 : 64) * DPR, 90, GL.worldBoss.hp / GL.worldBoss.maxHp, '#E85C4C');
   }
 }
 
@@ -297,10 +375,10 @@ GL.renderFrame = function (t) {
   Object.values(GL.remote).forEach((r) => {
     const { sx, sy } = worldToScreen(r.x, r.y);
     const cls = GL.classById(r.classId);
-    drawHumanoid(sx, sy, { color: cls?.color || '#8888ff', dir: r.dir || 1, moving: r.moving, t, weaponType: cls?.weaponType });
-    drawAvatarChip(sx, sy - 48 * DPR, cls, 11);
+    const gotSprite = drawSprite(sx, sy, cls?.portrait, { dir: r.dir || 1, moving: r.moving, t });
+    if (!gotSprite) drawHumanoid(sx, sy, { color: cls?.color || '#8888ff', dir: r.dir || 1, moving: r.moving, t, weaponType: cls?.weaponType });
     ctx.fillStyle = '#cfd6ff'; ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
-    ctx.fillText(`${r.name} Lv.${r.level || 1}`, sx, sy - 34 * DPR);
+    ctx.fillText(`${r.name} Lv.${r.level || 1}`, sx, sy - (gotSprite ? 80 : 34) * DPR);
   });
 
   GL.monsters.forEach((m) => drawMonster(m, t));
@@ -308,10 +386,10 @@ GL.renderFrame = function (t) {
 
   const p = GL.player, { sx, sy } = worldToScreen(p.x, p.y);
   const cls = GL.classById(GL.char.classId);
-  drawHumanoid(sx, sy, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
-  drawAvatarChip(sx, sy - 48 * DPR, cls, 12);
+  const gotSprite = drawSprite(sx, sy, cls.portrait, { dir: p.dir, moving: p.moving, t, heightPx: 80 });
+  if (!gotSprite) drawHumanoid(sx, sy, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
   ctx.fillStyle = '#fff'; ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
-  ctx.fillText(GL.char.name, sx, sy - 34 * DPR);
+  ctx.fillText(GL.char.name, sx, sy - (gotSprite ? 88 : 34) * DPR);
 
   // fx sát thương nổi
   GL.fx = GL.fx.filter((f) => f.t < f.life);

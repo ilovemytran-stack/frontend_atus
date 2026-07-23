@@ -1,0 +1,53 @@
+/* ===== MOTION SIMULATION (điều khiển bằng cử chỉ tay qua webcam) ===== */
+
+.ms-palette {
+  position: fixed; top: 84px; right: 20px; z-index: 900;
+  width: 224px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  display: none;
+  overflow: hidden;
+}
+.ms-palette.visible { display: block; }
+
+.ms-palette-handle {
+  cursor: grab; padding: 10px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(90deg, rgba(124,92,252,0.16), transparent);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--brand-hover);
+}
+.ms-palette-handle:active { cursor: grabbing; }
+
+.ms-preview {
+  position: relative; margin: 10px;
+  width: 204px; height: 153px;
+  border-radius: var(--radius-sm); overflow: hidden; background: #000;
+}
+.ms-preview video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; transform: scaleX(-1); /* soi gương cho tự nhiên */
+}
+.ms-preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.ms-status { padding: 0 12px 12px; font-size: 0.72rem; color: var(--text-secondary); }
+.ms-status-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.ms-status-row span:last-child { color: var(--text-primary); font-weight: 600; }
+
+/* Con trỏ ảo */
+#msCursor {
+  position: fixed; top: 0; left: 0; width: 28px; height: 28px;
+  margin-left: -14px; margin-top: -14px;
+  pointer-events: none; z-index: 901; display: none;
+  transition: transform 0.02s linear;
+}
+#msCursor.visible { display: block; }
+#msCursor svg { filter: drop-shadow(0 0 5px var(--brand-glow)); }
+
+@media (max-width: 480px) {
+  .ms-palette { right: 10px; top: 76px; width: 188px; }
+  .ms-preview { width: 168px; height: 126px; }
+}

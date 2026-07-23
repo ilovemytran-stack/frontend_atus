@@ -1,0 +1,113 @@
+/* ======================================================================
+   LIQUID GLASS — hệ thống giao diện mới cho phần CHÍNH của web (không áp
+   dụng cho Welcome/Atelier/Root Shop, theo đúng Redesign.md).
+   File này CỘNG THÊM vào global.css — trang nào link file này mới đổi giao
+   diện; trang chưa link vẫn giữ nguyên giao diện cũ, không bị ảnh hưởng.
+   ====================================================================== */
+
+/* Tắt hiệu ứng chuyển động cho người dùng chọn "giảm chuyển động" của hệ điều hành */
+@media (prefers-reduced-motion: reduce) {
+  .glass, .glass-btn, .glass-card, .lg-ripple, .glass-enter { transition: none !important; animation: none !important; }
+}
+
+/* ---------- Khối kính cơ bản ---------- */
+.glass {
+  position: relative;
+  background:
+    radial-gradient(560px circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,0.10), transparent 62%),
+    linear-gradient(180deg, var(--glass-fill-strong), var(--glass-fill));
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-glass);
+}
+.glass::after { /* viền sáng mỏng phía trên, tạo cảm giác mặt kính bắt sáng */
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+}
+
+/* ---------- Sidebar nổi ---------- */
+.glass-sidebar.sidebar {
+  top: 12px; left: 12px; height: calc(100dvh - 24px);
+  border-radius: var(--radius-xl);
+  transition: transform var(--spring);
+}
+.glass-sidebar ~ .main-content, body:has(.glass-sidebar) .main-content { margin-left: calc(var(--sidebar-w) + 24px); }
+@media (max-width: 768px) {
+  .glass-sidebar ~ .main-content, body:has(.glass-sidebar) .main-content { margin-left: 0; }
+}
+
+/* ---------- Top bar kính nổi (desktop) — chứa ô tìm kiếm ---------- */
+.glass-topbar {
+  position: sticky; top: 12px; z-index: 60;
+  margin: 0 0 20px; padding: 10px 14px;
+  border-radius: var(--radius-full);
+  display: flex; align-items: center; gap: 12px;
+}
+.glass-topbar .lg-search {
+  flex: 1; display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  border-radius: var(--radius-full); padding: 9px 16px;
+  transition: border-color var(--transition), background var(--transition);
+}
+.glass-topbar .lg-search:focus-within { border-color: var(--electric-cyan); background: rgba(34,211,238,0.06); }
+.glass-topbar .lg-search input { flex: 1; font-size: 0.92rem; }
+.glass-topbar .lg-search svg { color: var(--text-muted); flex-shrink: 0; }
+@media (max-width: 768px) { .glass-topbar { display: none; } }
+
+/* ---------- Bottom nav kính nổi (mobile) ---------- */
+.glass-bottomnav.bottom-nav {
+  left: 12px; right: 12px; bottom: 12px; width: auto;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--glass-border);
+}
+
+/* ---------- Card / panel kính ---------- */
+.glass-card {
+  border-radius: var(--radius-lg);
+  transition: transform var(--spring), box-shadow var(--spring);
+}
+.glass-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-glass), 0 0 0 1px var(--glass-border); }
+
+/* ---------- Nút kính ---------- */
+.glass-btn {
+  position: relative; overflow: hidden;
+  border-radius: var(--radius-full);
+  transition: transform var(--spring), background var(--spring);
+}
+.glass-btn:hover { transform: scale(1.035); }
+.glass-btn:active { transform: scale(0.96); }
+
+/* Gợn sóng khi bấm — spawn bằng liquid-glass.js */
+.lg-ripple {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.45), rgba(255,255,255,0) 70%);
+  transform: scale(0); animation: lg-ripple-out 0.65s ease-out forwards;
+}
+@keyframes lg-ripple-out { to { transform: scale(1); opacity: 0; } }
+
+/* Hiệu ứng "morph in" cho panel/modal xuất hiện */
+@keyframes lg-enter { from { opacity: 0; transform: scale(0.94) translateY(10px); } to { opacity: 1; transform: none; } }
+.glass-enter { animation: lg-enter var(--spring); }
+
+/* ---------- Chip/tag/badge kiểu kính ---------- */
+.glass-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: var(--radius-full);
+  background: var(--glass-fill); border: 1px solid var(--glass-border);
+  font-size: 0.78rem; font-weight: 600;
+}
+
+/* ---------- Tiêu đề lớn kiểu "Morphing UI" ---------- */
+.lg-heading {
+  font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #fff 20%, var(--electric-cyan) 60%, var(--violet) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.lg-subtle { color: var(--text-secondary); font-weight: 400; }
+
+/* Viền phát sáng dùng cho item đang active trong nav */
+.lg-active-glow {
+  background: linear-gradient(135deg, rgba(34,211,238,0.16), rgba(139,92,246,0.16));
+  box-shadow: inset 0 0 0 1px rgba(34,211,238,0.35);
+}

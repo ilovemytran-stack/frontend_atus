@@ -1,0 +1,2310 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ROOT://SHOP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0d0c; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+// Shim window.storage (API lưu trữ vốn chỉ có trong artifact Claude) bằng localStorage
+// để component chạy được như một trang HTML/JS thuần, không cần backend riêng cho phần này.
+if (!window.storage) {
+  const ns = (shared) => (shared ? 'shared:' : 'personal:');
+  window.storage = {
+    async get(key, shared = false) {
+      const raw = localStorage.getItem(ns(shared) + key);
+      if (raw === null) throw new Error('Key not found: ' + key);
+      return { key, value: raw, shared };
+    },
+    async set(key, value, shared = false) {
+      localStorage.setItem(ns(shared) + key, value);
+      return { key, value, shared };
+    },
+    async delete(key, shared = false) {
+      localStorage.removeItem(ns(shared) + key);
+      return { key, deleted: true, shared };
+    },
+    async list(prefix = '', shared = false) {
+      const p = ns(shared) + prefix;
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(p)) keys.push(k.slice(ns(shared).length));
+      }
+      return { keys, prefix, shared };
+    },
+  };
+}
+</script>
+
+<script type="module">
+import React, { useState, useMemo, useEffect, useRef } from 'https://esm.sh/react@18.3.1';
+import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1';
+import { Terminal, Search, ShoppingCart, X, Plus, Minus, Check, ChevronRight, ChevronDown, ArrowUpDown, Star, Loader2, Zap, LayoutGrid, Smartphone, Shirt, Sparkles, Home, Baby, Dumbbell, BookOpen, UtensilsCrossed, PawPrint, Watch, Headphones, Droplet, Package, Coffee, Settings, Trash2, ThumbsUp, ThumbsDown, Send, Landmark, History, ShieldCheck, ArrowUpFromLine, Server } from 'https://esm.sh/lucide-react@0.383.0?deps=react@18.3.1,react-dom@18.3.1';
+
+/* ================================================================
+   BACKEND BRIDGE — dùng chung tài khoản đăng nhập với toàn bộ site (đọc
+   localStorage 'ss_token', giống atelier.html/frontend/js/api.js), KHÔNG
+   còn hệ thống đăng ký số điện thoại/mật khẩu riêng cho Shop nữa. Ví
+   (balance) là tiền thật, đồng bộ qua backend + webhook SePay thật.
+   ================================================================ */
+const API_URL = 'https://webbyatus.onrender.com/api';
+function authHeaders() {
+  const t = localStorage.getItem('ss_token');
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+function goToLogin() { window.location.href = 'login.html'; }
+
+/* ---------------------------------- theme ---------------------------------- */
+const COLORS = {
+    bg: '#0a0d0c',
+    surface: '#111615',
+    surfaceAlt: '#161c1a',
+    border: '#1f2b26',
+    accent: '#34d399',
+    amber: '#fbbf24',
+    danger: '#f87171',
+    text: '#e5f2ec',
+    mutedLight: '#a8bdb3',
+    muted: '#6f8479',
+};
+const CATEGORY_COLORS = {
+    tech: '#22d3ee',
+    fashion: '#f472b6',
+    beauty: '#fb7185',
+    'home-living': '#38bdf8',
+    'mom-baby': '#fbbf24',
+    'sports-travel': '#a3e635',
+    'books-stationery': '#a78bfa',
+    'food-beverage': '#fb923c',
+    pets: '#facc15',
+    'watches-jewelry': '#e879f9',
+    digital: '#818cf8',
+};
+const STATUS_CONFIG = {
+    'in-stock': { label: 'Còn Hàng', color: '#34d399' },
+    deposit: { label: 'Đặt Cọc', color: '#fbbf24' },
+    sold: { label: 'Đã Bán', color: '#94a3b8' },
+    'out-of-stock': { label: 'Hết Hàng', color: '#f87171' },
+};
+const CATEGORY_PREFIX = {
+    tech: 'TECH', fashion: 'FA', beauty: 'BT', 'home-living': 'HL', 'mom-baby': 'MB',
+    'sports-travel': 'ST', 'books-stationery': 'BS', 'food-beverage': 'FB', pets: 'PT', 'watches-jewelry': 'WJ', digital: 'DG',
+};
+function generateCode(category) {
+    const prefix = CATEGORY_PREFIX[category] || 'SP';
+    return `${prefix}-${Math.floor(Math.random() * 90 + 10)}`;
+}
+// Mã BIN ngân hàng theo chuẩn Napas/VietQR
+const VIETNAM_BANKS = [
+    { code: '970436', name: 'Vietcombank' },
+    { code: '970415', name: 'VietinBank' },
+    { code: '970418', name: 'BIDV' },
+    { code: '970405', name: 'Agribank' },
+    { code: '970407', name: 'Techcombank' },
+    { code: '970422', name: 'MB Bank' },
+    { code: '970416', name: 'ACB' },
+    { code: '970432', name: 'VPBank' },
+    { code: '970403', name: 'Sacombank' },
+    { code: '970423', name: 'TPBank' },
+];
+function stripDiacritics(str) {
+    return str.replace(/đ/g, 'd').replace(/Đ/g, 'D').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+const FONT_STACK = "'JetBrains Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace";
+const CUSTOM_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+
+.rootshop, .rootshop * { font-family: ${FONT_STACK}; box-sizing: border-box; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+.hax-scroll::-webkit-scrollbar { width: 6px; }
+.hax-scroll::-webkit-scrollbar-track { background: transparent; }
+.hax-scroll::-webkit-scrollbar-thumb { background: rgba(52,211,153,0.35); border-radius: 3px; }
+.hax-scroll::-webkit-scrollbar-thumb:hover { background: rgba(52,211,153,0.55); }
+
+.blink-cursor { animation: blink 1.1s step-end infinite; }
+@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.card-reveal { animation: fadeInUp 0.45s ease both; }
+
+@keyframes modalPop { from { opacity: 0; transform: scale(0.95) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.modal-pop { animation: modalPop 0.25s ease both; }
+
+.typewriter { display: inline-block; overflow: hidden; white-space: nowrap; border-right: 2px solid currentColor; width: 0; animation: typing 1.6s steps(30,end) forwards, caretBlink 0.8s step-end infinite; }
+@keyframes typing { from { width: 0; } to { width: 100%; } }
+@keyframes caretBlink { 50% { border-color: transparent; } }
+
+.product-card { border: 1px solid #1f2b26; }
+.product-card:hover { border-color: var(--cat-color); }
+
+.search-input { border: 1px solid #1f2b26; }
+.search-input:focus { border-color: #34d399; outline: none; box-shadow: 0 0 0 3px rgba(52,211,153,0.12); }
+
+.pill-btn:hover { filter: brightness(1.2); }
+
+.no-spinner::-webkit-outer-spin-button, .no-spinner::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.no-spinner { -moz-appearance: textfield; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-reveal, .modal-pop, .typewriter, .blink-cursor { animation: none !important; }
+}
+`;
+const formatVND = (amount) => amount.toLocaleString('vi-VN') + '₫';
+const STORAGE_KEY = 'shop-inventory-v2';
+const IMAGES_STORAGE_KEY = 'shop-images-v1';
+const MAX_IMAGES = 6;
+function compressImage(file, maxDim = 640, quality = 0.65) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new window.Image();
+            img.onload = () => {
+                let { width, height } = img;
+                if (width >= height && width > maxDim) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                }
+                else if (height > width && height > maxDim) {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => reject(new Error('Không thể đọc ảnh'));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('Không thể đọc file'));
+        reader.readAsDataURL(file);
+    });
+}
+/* ------------------------------ ví, đăng nhập, giao dịch ------------------------------ *
+ * CHẾ ĐỘ HIỆN TẠI: chạy hoàn toàn phía client (lưu trong trình duyệt qua window.storage),
+ * KHÔNG gọi backend thật. Tài khoản, số dư, giao dịch đều là mô phỏng để bạn test luồng
+ * mua hàng / nạp / rút ngay hôm nay. Khi bạn nối Webhook + SePay ở "main website" sau này,
+ * chỉ cần thay các hàm login/register/startTopup/confirmTopup/... bên dưới bằng fetch tới
+ * backend thật — phần giao diện (modal, wallet, lịch sử...) giữ nguyên không cần sửa.
+ *
+ * Gợi ý hợp đồng API cho backend thật sau này (giữ nguyên tên field để dễ thay thế):
+ *  POST /auth/login          { phone, password }        -> { token, user: { id, name, phone, balance } }
+ *  POST /auth/register       { phone, password, name }  -> { token, user }
+ *  GET  /wallet/me           (Bearer token)              -> { balance }
+ *  POST /wallet/topup        (Bearer token) { amount }   -> { id, code, status }         // status: 'pending'
+ *  GET  /wallet/topup/:id    (Bearer token)               -> { status, balance }         // status: 'pending'|'paid'|'expired'
+ *  POST /wallet/withdraw     (Bearer token) { amount, bankCode, accountNumber, accountName }
+ *                                                          -> { id, status }               // status: 'pending'
+ *  POST /orders              { items, total, name, phone, address, payment }
+ *                                                          -> { id, code, status }         // status: 'pending' (transfer) | 'confirmed' (cod)
+ *  GET  /orders/:id                                        -> { status }                    // 'pending'|'paid'|'confirmed'|'expired'
+ *
+ * Khi webhook báo có tiền vào khớp nội dung mã giao dịch, backend tự cập nhật record đó
+ * thành 'paid' (và cộng amount vào balance user). Cho tới lúc đó, các nút "TÔI ĐÃ CHUYỂN
+ * KHOẢN" bên dưới đóng vai trò xác nhận thủ công thay cho webhook.
+ * ------------------------------------------------------------------------------- */
+const USERS_STORAGE_KEY = 'shop-users-v1'; // { [phone]: { phone, password, name, balance, seller, withdrawBank } }
+const SESSION_STORAGE_KEY = 'shop-session-v1'; // { phone }
+const TX_STORAGE_KEY = 'shop-transactions-v1'; // { [phone]: Transaction[] }
+const DIGITAL_ORDERS_STORAGE_KEY = 'shop-digital-orders-v1'; // DigitalOrder[]
+const DIGITAL_STOCK_STORAGE_KEY = 'shop-digital-stock-v1'; // { [productId]: string[] } — kho tài khoản chưa bán
+const MIN_TOPUP = 1000;
+const MIN_WITHDRAW = 50000;
+const PLATFORM_COMMISSION_RATE = 0.2; // chiết khấu sàn 20% trên mọi loại sản phẩm, giống Shopee/TikTok Shop
+const DIGITAL_HOLD_HOURS = 72; // giữ tiền 3 ngày trước khi tự động chuyển cho người bán, giống taphoammo/GC MMO
+function normalizePhone(phone) {
+    return (phone || '').replace(/\D/g, '');
+}
+function validIdCardNumber(id) {
+    const digits = (id || '').replace(/\D/g, '');
+    return digits.length === 9 || digits.length === 12;
+}
+function genCode(prefix) {
+    return prefix + Math.floor(100000 + Math.random() * 900000);
+}
+function genId(prefix) {
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+function formatDateTime(iso) {
+    try {
+        return new Date(iso).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    catch (e) {
+        return '';
+    }
+}
+function formatRemaining(iso) {
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms <= 0)
+        return 'sắp xử lý';
+    const hours = Math.floor(ms / 3600000);
+    const days = Math.floor(hours / 24);
+    if (days > 0)
+        return `còn ${days} ngày ${hours % 24} giờ`;
+    const mins = Math.floor((ms % 3600000) / 60000);
+    return `còn ${hours} giờ ${mins} phút`;
+}
+const TX_TYPE_META = {
+    topup: { label: 'Nạp tiền', icon: Landmark },
+    purchase: { label: 'Mua ngay', icon: Zap },
+    withdraw: { label: 'Rút tiền', icon: ArrowUpFromLine },
+    sale: { label: 'Bán hàng', icon: ShoppingCart },
+    refund: { label: 'Hoàn tiền', icon: Check },
+};
+const TX_STATUS_META = {
+    completed: { label: 'Thành công', color: '#34d399' },
+    pending: { label: 'Đang xử lý', color: '#fbbf24' },
+    rejected: { label: 'Bị từ chối', color: '#f87171' },
+};
+// Trạng thái đơn hàng số — mô phỏng kiểu "kho hàng tự động" của GC MMO / Tạp Hoá MMO:
+// hệ thống tự động giao 1 dòng tài khoản trong kho ngay khi mua (không cần người bán thao tác).
+// Tiền được giữ tạm DIGITAL_HOLD_HOURS giờ để người mua kiểm tra; hết thời gian mà không có
+// khiếu nại thì tự động chuyển cho người bán (trừ 20% chiết khấu sàn) — người mua cũng có thể
+// xác nhận sớm hơn, hoặc gửi khiếu nại để admin (chế độ quản lý) xử lý.
+const DIGITAL_ORDER_STATUS_META = {
+    delivered: { label: 'Đã giao - đang tạm giữ tiền', color: '#38bdf8' },
+    disputed: { label: 'Đang khiếu nại', color: '#fbbf24' },
+    completed: { label: 'Hoàn tất', color: '#34d399' },
+    refunded: { label: 'Đã hoàn tiền', color: '#f87171' },
+};
+/* ---------------------------------- data ---------------------------------- */
+const CATEGORIES = [
+    { id: 'all', name: 'Tất Cả', icon: LayoutGrid },
+    { id: 'tech', name: 'Công Nghệ', icon: Smartphone },
+    { id: 'fashion', name: 'Thời Trang', icon: Shirt },
+    { id: 'beauty', name: 'Làm Đẹp', icon: Sparkles },
+    { id: 'home-living', name: 'Nhà Cửa & Đời Sống', icon: Home },
+    { id: 'mom-baby', name: 'Mẹ & Bé', icon: Baby },
+    { id: 'sports-travel', name: 'Thể Thao & Du Lịch', icon: Dumbbell },
+    { id: 'books-stationery', name: 'Sách & Văn Phòng Phẩm', icon: BookOpen },
+    { id: 'food-beverage', name: 'Thực Phẩm & Đồ Uống', icon: UtensilsCrossed },
+    { id: 'pets', name: 'Thú Cưng', icon: PawPrint },
+    { id: 'watches-jewelry', name: 'Đồng Hồ & Trang Sức', icon: Watch },
+    { id: 'digital', name: 'Sản Phẩm Số', icon: Server },
+];
+const PRODUCTS = [
+    { id: 'tech1', code: 'TECH-01', name: 'Tai Nghe Bluetooth Chống Ồn', category: 'tech', icon: Headphones, price: 890000, originalPrice: 1190000, rating: 4.8, reviews: 2450, likes: 890, dislikes: 24, tag: 'HOT', stock: 24, status: 'in-stock', desc: 'Tai nghe true wireless với chống ồn chủ động, âm bass sâu và pin dùng cả ngày.', specs: ['Chống ồn: ANC chủ động', 'Pin: 30 giờ (kèm hộp sạc)', 'Kết nối: Bluetooth 5.3', 'Chống nước: IPX5'] },
+    { id: 'fa4', code: 'FA-04', name: 'Giày Sneaker Trắng Basic', category: 'fashion', icon: Shirt, price: 549000, originalPrice: 699000, rating: 4.8, reviews: 2100, likes: 780, dislikes: 21, tag: 'HOT', stock: 40, status: 'in-stock', desc: 'Đế cao su êm chân, phối được với hầu hết trang phục hàng ngày.', specs: ['Chất liệu: Da PU + vải', 'Đế: Cao su chống trượt', 'Size: 36 - 44', 'Trọng lượng: 320g/chiếc'] },
+    { id: 'bt2', code: 'BT-02', name: 'Son Lì Lâu Trôi', category: 'beauty', icon: Sparkles, price: 149000, rating: 4.8, reviews: 2890, likes: 1050, dislikes: 28, tag: 'HOT', stock: 65, status: 'in-stock', desc: 'Kết cấu mịn nhẹ, bám màu tới 8 giờ mà không gây khô môi.', specs: ['Kết cấu: Lì mịn (matte)', 'Thời gian bám màu: 8 giờ', 'Trọng lượng: 3.5g', 'Số màu: 12 tông'] },
+    { id: 'hl4', code: 'HL-04', name: 'Máy Khuếch Tán Tinh Dầu', category: 'home-living', icon: Droplet, price: 349000, rating: 4.8, reviews: 1560, likes: 560, dislikes: 16, tag: 'HOT', stock: 28, status: 'in-stock', desc: 'Phun sương siêu âm êm ái, kèm đèn LED đổi màu tạo không gian thư giãn.', specs: ['Dung tích bình: 300ml', 'Công nghệ: Phun sương siêu âm', 'Đèn LED: 7 màu đổi liên tục', 'Tắt tự động: Khi hết nước'] },
+    { id: 'mb2', code: 'MB-02', name: 'Địu Em Bé Đa Năng', category: 'mom-baby', icon: Baby, price: 459000, rating: 4.8, reviews: 980, likes: 360, dislikes: 10, tag: 'HOT', stock: 25, status: 'in-stock', desc: '4 tư thế địu linh hoạt, nâng đỡ vùng lưng và hông giúp bố mẹ đỡ mỏi.', specs: ['Tư thế địu: 4 kiểu', 'Chất liệu: Cotton thoáng khí', 'Tải trọng: Tới 15kg', 'Độ tuổi: 0-36 tháng'] },
+    { id: 'st2', code: 'ST-02', name: 'Balo Du Lịch Chống Nước 40L', category: 'sports-travel', icon: Package, price: 690000, rating: 4.8, reviews: 1090, likes: 400, dislikes: 11, tag: 'HOT', stock: 18, status: 'in-stock', desc: 'Ngăn chia hợp lý, lớp vải chống nước bảo vệ đồ đạc qua mọi thời tiết.', specs: ['Dung tích: 40L', 'Chất liệu: Vải chống nước', 'Ngăn laptop: Tới 15.6 inch', 'Quai đeo: Đệm êm chống mỏi vai'] },
+    { id: 'bs3', code: 'BS-03', name: 'Sách Kỹ Năng Sống Bán Chạy', category: 'books-stationery', icon: BookOpen, price: 99000, rating: 4.8, reviews: 1780, likes: 640, dislikes: 18, tag: 'HOT', stock: 0, status: 'out-of-stock', desc: 'Cuốn sách truyền cảm hứng về quản lý thời gian và xây dựng thói quen tốt.', specs: ['Số trang: 280 trang', 'Nhà xuất bản: Trong nước', 'Ngôn ngữ: Tiếng Việt', 'Bìa: Bìa mềm'] },
+    { id: 'fb1', code: 'FB-01', name: 'Cà Phê Rang Xay Nguyên Chất', category: 'food-beverage', icon: Coffee, price: 129000, rating: 4.8, reviews: 2010, likes: 720, dislikes: 20, tag: 'HOT', stock: 48, status: 'in-stock', desc: '100% hạt Arabica rang mộc, hương thơm đậm đà chuẩn vị cà phê phin.', specs: ['Loại hạt: 100% Arabica', 'Mức rang: Rang vừa', 'Khối lượng: 500g', 'Xuất xứ: Đà Lạt'] },
+    { id: 'pt1', code: 'PT-01', name: 'Hạt Khô Cho Mèo Vị Cá Hồi', category: 'pets', icon: PawPrint, price: 189000, rating: 4.7, reviews: 1340, likes: 480, dislikes: 13, tag: 'HOT', stock: 40, status: 'in-stock', desc: 'Bổ sung Omega-3 từ cá hồi giúp lông mượt, công thức dễ tiêu hóa.', specs: ['Vị: Cá hồi', 'Khối lượng: 1.5kg', 'Độ tuổi: Mèo trưởng thành', 'Bổ sung: Omega-3, Taurine'] },
+    { id: 'wj1', code: 'WJ-01', name: 'Đồng Hồ Nam Dây Da Cổ Điển', category: 'watches-jewelry', icon: Watch, price: 890000, originalPrice: 1290000, rating: 4.8, reviews: 1120, likes: 400, dislikes: 11, tag: 'HOT', stock: 4, status: 'deposit', desc: 'Mặt kính chống trầy, dây da bò thật, thiết kế thanh lịch phù hợp công sở.', specs: ['Chất liệu dây: Da bò thật', 'Mặt kính: Chống trầy xước', 'Chống nước: 3ATM', 'Bảo hành: 12 tháng'] },
+    { id: 'dg1', code: 'DG-01', name: 'Thuê VPS SSD 2GB RAM - Gói 1 Tháng', category: 'digital', icon: Server, price: 150000, rating: 4.9, reviews: 210, likes: 95, dislikes: 3, tag: 'HOT', stock: 3, status: 'in-stock', desc: 'VPS SSD tốc độ cao, băng thông không giới hạn. Thông tin đăng nhập được hệ thống tự động giao ngay sau khi thanh toán thành công.', specs: ['CPU: 2 vCPU', 'RAM: 2GB', 'Ổ đĩa: 40GB SSD', 'Thời hạn: 1 tháng'] },
+    { id: 'dg2', code: 'DG-02', name: 'Thuê Tài Khoản Claude Pro - 1 Tháng', category: 'digital', icon: Server, price: 250000, rating: 4.8, reviews: 340, likes: 140, dislikes: 5, tag: 'HOT', stock: 2, status: 'in-stock', desc: 'Tài khoản Claude Pro dùng riêng, không giới hạn dùng chung. Thông tin đăng nhập được hệ thống tự động giao ngay sau khi thanh toán thành công.', specs: ['Gói: Claude Pro', 'Thời hạn: 1 tháng', 'Loại: Dùng riêng (không share)', 'Hỗ trợ: Đổi tài khoản nếu lỗi'] },
+    { id: 'dg3', code: 'DG-03', name: 'Thuê Tài Khoản ChatGPT Plus - 1 Tháng', category: 'digital', icon: Server, price: 220000, rating: 4.7, reviews: 280, likes: 110, dislikes: 6, tag: 'MỚI', stock: 2, status: 'in-stock', desc: 'Tài khoản ChatGPT Plus riêng, hỗ trợ các tính năng nâng cao. Thông tin đăng nhập được hệ thống tự động giao ngay sau khi thanh toán thành công.', specs: ['Gói: ChatGPT Plus', 'Thời hạn: 1 tháng', 'Loại: Dùng riêng', 'Hỗ trợ: Đổi tài khoản nếu lỗi'] },
+];
+const SEED_COMMENTS = {
+    tech1: [
+        { id: 'seed1', author: 'Minh Anh', text: 'Âm thanh hay, chống ồn tốt, đáng tiền!', time: '2 ngày trước' },
+        { id: 'seed2', author: 'Hoàng Nam', text: 'Pin trâu, dùng cả tuần mới cần sạc lại.', time: '5 ngày trước' },
+    ],
+    bt2: [
+        { id: 'seed3', author: 'Thu Hà', text: 'Màu lên chuẩn, không bị khô môi như son lì khác.', time: '1 ngày trước' },
+    ],
+    fa4: [
+        { id: 'seed4', author: 'Quốc Bảo', text: 'Đi êm chân, form giày đẹp, sẽ ủng hộ tiếp.', time: '3 ngày trước' },
+    ],
+};
+const clamp2 = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: '2.5em' };
+// Backend chỉ gửi TÊN icon (string) vì không lưu được React component vào DB — map lại thành component ở đây.
+const ICONS = { Headphones, Shirt, Sparkles, Droplet, Baby, Package, BookOpen, Coffee, PawPrint, Watch, Server };
+const inputStyle = { background: '#0a0d0c', border: '1px solid #1f2b26', color: '#e5f2ec', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', width: '100%' };
+const labelStyle = { fontSize: '10px', color: '#6f8479', textTransform: 'uppercase', letterSpacing: '0.03em' };
+/* -------------------------------- bits -------------------------------- */
+function StarRating({ rating }) {
+    return (React.createElement("div", { className: "flex items-center gap-0.5" }, [1, 2, 3, 4, 5].map((i) => (React.createElement(Star, { key: i, size: 11, fill: i <= Math.round(rating) ? '#fbbf24' : 'none', style: { color: i <= Math.round(rating) ? '#fbbf24' : '#33413b' } })))));
+}
+function TitleBar({ path, onClose, size = 10 }) {
+    return (React.createElement("div", { className: "flex items-center gap-1.5 px-3 py-2 shrink-0", style: { borderBottom: `1px solid ${COLORS.border}` } },
+        React.createElement("span", { className: "rounded-full", style: { width: size, height: size, background: '#ff5f56' } }),
+        React.createElement("span", { className: "rounded-full", style: { width: size, height: size, background: '#ffbd2e' } }),
+        React.createElement("span", { className: "rounded-full", style: { width: size, height: size, background: '#27c93f' } }),
+        React.createElement("span", { className: "ml-1.5 truncate", style: { fontSize: '10px', color: COLORS.muted } }, path),
+        onClose && (React.createElement("button", { onClick: onClose, "aria-label": "\u0110\u00F3ng", className: "ml-auto p-1 rounded transition-colors duration-150", style: { color: COLORS.muted } },
+            React.createElement(X, { size: 15 })))));
+}
+function QuantityInput({ value, onChange, min = 0, max = 999999, compact }) {
+    return (React.createElement("div", { className: "flex items-center gap-1.5", onClick: (e) => e.stopPropagation() },
+        React.createElement("button", { type: "button", onClick: () => onChange(Math.max(min, value - 1)), "aria-label": "Gi\u1EA3m s\u1ED1 l\u01B0\u1EE3ng", className: "rounded flex items-center justify-center shrink-0 pill-btn", style: { width: compact ? 20 : 24, height: compact ? 20 : 24, background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}` } },
+            React.createElement(Minus, { size: compact ? 10 : 11 })),
+        React.createElement("input", { type: "number", value: value, onChange: (e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                    onChange(min);
+                    return;
+                }
+                const v = parseInt(raw, 10);
+                if (!isNaN(v))
+                    onChange(Math.max(min, Math.min(max, v)));
+            }, className: "no-spinner text-center font-semibold", style: { width: compact ? '38px' : '46px', fontSize: compact ? '11px' : '12px', background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: '4px', color: COLORS.text, padding: '2px 0' } }),
+        React.createElement("button", { type: "button", onClick: () => onChange(Math.min(max, value + 1)), "aria-label": "T\u0103ng s\u1ED1 l\u01B0\u1EE3ng", className: "rounded flex items-center justify-center shrink-0 pill-btn", style: { width: compact ? 20 : 24, height: compact ? 20 : 24, background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}` } },
+            React.createElement(Plus, { size: compact ? 10 : 11 }))));
+}
+function SortDropdown({ value, onChange }) {
+    const [open, setOpen] = useState(false);
+    const options = [
+        { id: 'featured', label: 'Nổi Bật' },
+        { id: 'price-asc', label: 'Giá: Thấp đến Cao' },
+        { id: 'price-desc', label: 'Giá: Cao đến Thấp' },
+        { id: 'rating', label: 'Đánh Giá Cao' },
+    ];
+    const current = options.find((o) => o.id === value) || options[0];
+    return (React.createElement("div", { className: "relative shrink-0" },
+        React.createElement("button", { onClick: () => setOpen((o) => !o), className: "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-all duration-200 pill-btn", style: { background: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.text } },
+            React.createElement(ArrowUpDown, { size: 12, style: { color: COLORS.accent } }),
+            current.label,
+            React.createElement(ChevronDown, { size: 12, style: { transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' } })),
+        open && (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "fixed inset-0 z-10", onClick: () => setOpen(false) }),
+            React.createElement("div", { className: "absolute right-0 mt-1.5 rounded-md overflow-hidden z-20 card-reveal", style: { background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}`, minWidth: '190px' } }, options.map((o) => (React.createElement("button", { key: o.id, onClick: () => { onChange(o.id); setOpen(false); }, className: "block w-full text-left px-3 py-2 text-xs transition-colors duration-150 pill-btn", style: { color: o.id === value ? COLORS.accent : COLORS.text, background: o.id === value ? 'rgba(52,211,153,0.08)' : 'transparent' } }, o.label))))))));
+}
+function StatusDropdown({ value, onChange }) {
+    const [open, setOpen] = useState(false);
+    const current = STATUS_CONFIG[value];
+    return (React.createElement("div", { className: "relative", onClick: (e) => e.stopPropagation() },
+        React.createElement("button", { onClick: () => setOpen((o) => !o), className: "w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-md transition-all duration-200", style: { fontSize: '10px', background: `${current.color}18`, border: `1px solid ${current.color}`, color: current.color } },
+            React.createElement("span", { className: "font-bold flex items-center gap-1" },
+                React.createElement("span", { className: "w-1.5 h-1.5 rounded-full shrink-0", style: { background: current.color } }),
+                " ",
+                current.label),
+            React.createElement(ChevronDown, { size: 11, style: { transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' } })),
+        open && (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "fixed inset-0 z-30", onClick: () => setOpen(false) }),
+            React.createElement("div", { className: "absolute left-0 right-0 mt-1 rounded-md overflow-hidden z-40 card-reveal", style: { background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}` } }, Object.entries(STATUS_CONFIG).map(([key, cfg]) => (React.createElement("button", { key: key, onClick: () => { onChange(key); setOpen(false); }, className: "flex items-center gap-1.5 w-full text-left px-2.5 py-1.5 pill-btn", style: { fontSize: '10px', color: cfg.color, background: key === value ? `${cfg.color}15` : 'transparent' } },
+                React.createElement("span", { className: "w-1.5 h-1.5 rounded-full shrink-0", style: { background: cfg.color } }),
+                " ",
+                cfg.label))))))));
+}
+function ManageControls({ product, onUpdateStatus, onSetStock, onDelete, onRestockDigital }) {
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [restocking, setRestocking] = useState(false);
+    const [restockText, setRestockText] = useState('');
+    const isDigital = product.category === 'digital';
+    function submitRestock() {
+        const lines = restockText.split('\n').map((s) => s.trim()).filter(Boolean);
+        if (lines.length === 0)
+            return;
+        onRestockDigital(product.id, lines);
+        setRestockText('');
+        setRestocking(false);
+    }
+    return (React.createElement("div", { onClick: (e) => e.stopPropagation() },
+        React.createElement(StatusDropdown, { value: product.status, onChange: (s) => onUpdateStatus(product.id, s) }),
+        React.createElement("div", { className: "flex items-center gap-1.5 mt-1.5" },
+            isDigital ? (React.createElement("button", { onClick: () => setRestocking((v) => !v), className: "px-2 py-1 rounded flex items-center gap-1 shrink-0", style: { fontSize: '10px', background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } },
+                React.createElement(Plus, { size: 11 }),
+                ` Kho (${product.stock})`)) : (React.createElement(QuantityInput, { value: product.stock, onChange: (v) => onSetStock(product.id, v), min: 0, compact: true })),
+            React.createElement("div", { className: "flex-1" }),
+            confirmDelete ? (React.createElement("div", { className: "flex items-center gap-1 shrink-0" },
+                React.createElement("button", { onClick: () => onDelete(product.id), "aria-label": "X\u00E1c nh\u1EADn xo\u00E1", className: "w-6 h-6 rounded flex items-center justify-center", style: { background: COLORS.danger, color: '#1a0505' } },
+                    React.createElement(Check, { size: 12 })),
+                React.createElement("button", { onClick: () => setConfirmDelete(false), "aria-label": "Hu\u1EF7 xo\u00E1", className: "w-6 h-6 rounded flex items-center justify-center", style: { background: COLORS.surfaceAlt, border: `1px solid ${COLORS.border}` } },
+                    React.createElement(X, { size: 12 })))) : (React.createElement("button", { onClick: () => setConfirmDelete(true), "aria-label": "Xo\u00E1 s\u1EA3n ph\u1EA9m", className: "w-6 h-6 rounded flex items-center justify-center shrink-0", style: { background: 'rgba(248,113,113,0.12)', border: `1px solid ${COLORS.danger}`, color: COLORS.danger } },
+                React.createElement(Trash2, { size: 12 })))),
+        isDigital && restocking && (React.createElement("div", { className: "mt-1.5" },
+            React.createElement("textarea", { value: restockText, onChange: (e) => setRestockText(e.target.value), rows: 2, placeholder: "M\u1ED7i d\u00F2ng 1 s\u1EA3n ph\u1EA9m...", className: "search-input", style: { ...inputStyle, resize: 'vertical', fontSize: '11px' } }),
+            React.createElement("button", { onClick: submitRestock, className: "w-full mt-1 py-1 rounded font-bold", style: { fontSize: '10px', background: COLORS.amber, color: '#1a1200' } }, "TH\u00CAM_V\u00C0O_KHO"))),
+        confirmDelete && React.createElement("p", { style: { fontSize: '9px', color: COLORS.danger }, className: "mt-1" },
+            "rm -rf ./",
+            product.code,
+            " ?")));
+}
+function ImageManager({ productId, images, onAdd, onRemove }) {
+    const [busy, setBusy] = useState(false);
+    const remaining = MAX_IMAGES - images.length;
+    async function handleFiles(e) {
+        const files = Array.from(e.target.files).slice(0, remaining);
+        if (files.length === 0) {
+            e.target.value = '';
+            return;
+        }
+        setBusy(true);
+        try {
+            const compressed = await Promise.all(files.map((f) => compressImage(f)));
+            onAdd(productId, compressed);
+        }
+        catch (err) {
+            console.error('Lỗi xử lý ảnh', err);
+        }
+        finally {
+            setBusy(false);
+            e.target.value = '';
+        }
+    }
+    return (React.createElement("div", { onClick: (e) => e.stopPropagation() },
+        React.createElement("p", { style: { fontSize: '10px', color: COLORS.muted }, className: "mb-2" },
+            "// h\u00ECnh \u1EA3nh (",
+            images.length,
+            "/",
+            MAX_IMAGES,
+            ")"),
+        React.createElement("div", { className: "flex gap-2 flex-wrap" },
+            images.map((img, i) => (React.createElement("div", { key: i, className: "relative shrink-0", style: { width: 56, height: 56 } },
+                React.createElement("img", { src: img, alt: "", className: "w-full h-full object-cover rounded", style: { border: `1px solid ${COLORS.border}` } }),
+                React.createElement("button", { onClick: () => onRemove(productId, i), "aria-label": "Xo\u00E1 \u1EA3nh", className: "absolute flex items-center justify-center rounded-full", style: { top: -6, right: -6, width: 18, height: 18, background: COLORS.danger, color: '#1a0505' } },
+                    React.createElement(X, { size: 10 }))))),
+            remaining > 0 && (React.createElement("label", { className: "flex items-center justify-center rounded cursor-pointer shrink-0", style: { width: 56, height: 56, border: `1px dashed ${COLORS.border}`, color: COLORS.muted } },
+                busy ? React.createElement(Loader2, { size: 16, className: "animate-spin" }) : React.createElement(Plus, { size: 18 }),
+                React.createElement("input", { type: "file", accept: "image/*", multiple: true, onChange: handleFiles, className: "hidden", disabled: busy }))))));
+}
+function EmptyState({ query, onClear }) {
+    return (React.createElement("div", { className: "flex flex-col items-center justify-center py-20 text-center px-4" },
+        React.createElement(Terminal, { size: 34, style: { color: COLORS.muted }, className: "mb-4" }),
+        React.createElement("p", { className: "text-sm mb-1", style: { color: COLORS.muted } },
+            "$ grep -i \"",
+            query,
+            "\" ./products.db"),
+        React.createElement("p", { className: "text-sm mb-5 font-semibold", style: { color: COLORS.danger } }, "\u2192 0 k\u1EBFt qu\u1EA3 ph\u00F9 h\u1EE3p"),
+        React.createElement("button", { onClick: onClear, className: "px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.accent, color: '#06120c' } }, "\u0110\u1EB6T_L\u1EA0I_B\u1ED8_L\u1ECCC")));
+}
+function CommentsSection({ productId, comments, onAdd }) {
+    const [text, setText] = useState('');
+    function submit() {
+        if (!text.trim())
+            return;
+        onAdd(productId, text);
+        setText('');
+    }
+    return (React.createElement("div", null,
+        React.createElement("p", { className: "mb-2", style: { fontSize: '10px', color: COLORS.muted } },
+            "// b\u00ECnh lu\u1EADn (",
+            comments.length,
+            ")"),
+        React.createElement("div", { className: "flex gap-2 mb-3" },
+            React.createElement("input", { value: text, onChange: (e) => setText(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter')
+                    submit(); }, placeholder: "Vi\u1EBFt b\u00ECnh lu\u1EADn...", className: "search-input flex-1 px-2.5 py-1.5 rounded-md text-xs", style: { background: COLORS.bg, color: COLORS.text } }),
+            React.createElement("button", { onClick: submit, "aria-label": "G\u1EEDi b\u00ECnh lu\u1EADn", className: "px-2.5 rounded-md shrink-0 transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.accent, color: '#06120c' } },
+                React.createElement(Send, { size: 13 }))),
+        React.createElement("div", { className: "space-y-2 overflow-y-auto hax-scroll", style: { maxHeight: '170px' } }, comments.length === 0 ? (React.createElement("p", { style: { fontSize: '11px', color: COLORS.muted } }, "Ch\u01B0a c\u00F3 b\u00ECnh lu\u1EADn n\u00E0o. H\u00E3y l\u00E0 ng\u01B0\u1EDDi \u0111\u1EA7u ti\u00EAn!")) : (comments.map((c) => (React.createElement("div", { key: c.id, className: "p-2 rounded-md", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+            React.createElement("div", { className: "flex items-center justify-between mb-1" },
+                React.createElement("span", { style: { fontSize: '11px', fontWeight: 'bold', color: COLORS.accent } }, c.author),
+                React.createElement("span", { style: { fontSize: '10px', color: COLORS.muted } }, c.time)),
+            React.createElement("p", { style: { fontSize: '12px', color: COLORS.mutedLight } }, c.text))))))));
+}
+/* ------------------------------ product card ------------------------------ */
+function ProductCard({ product, index, onOpen, onAdd, onBuyNow, justAdded, manageMode, onUpdateStatus, onSetStock, onDelete, onRestockDigital }) {
+    const Icon = product.icon;
+    const catColor = CATEGORY_COLORS[product.category];
+    const statusCfg = STATUS_CONFIG[product.status];
+    const available = product.status === 'in-stock' && product.stock > 0;
+    const hasImage = product.images && product.images.length > 0;
+    return (React.createElement("div", { className: "product-card group relative rounded-lg overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 card-reveal", style: { background: COLORS.surface, '--cat-color': catColor, animationDelay: `${(index % 12) * 40}ms` }, onClick: () => onOpen(product) },
+        React.createElement("div", { className: "flex items-center gap-1.5 px-3 py-2", style: { borderBottom: `1px solid ${COLORS.border}` } },
+            React.createElement("span", { className: "w-2 h-2 rounded-full", style: { background: '#ff5f56' } }),
+            React.createElement("span", { className: "w-2 h-2 rounded-full", style: { background: '#ffbd2e' } }),
+            React.createElement("span", { className: "w-2 h-2 rounded-full", style: { background: '#27c93f' } }),
+            React.createElement("span", { className: "ml-1.5 truncate", style: { fontSize: '10px', color: COLORS.muted } },
+                "~/",
+                product.category,
+                "/",
+                product.code),
+            available && product.tag && (React.createElement("span", { className: "ml-auto px-1.5 py-0.5 rounded font-bold shrink-0", style: { fontSize: '9px', background: product.tag === 'HOT' ? 'rgba(251,191,36,0.15)' : 'rgba(52,211,153,0.15)', color: product.tag === 'HOT' ? COLORS.amber : COLORS.accent } }, product.tag)),
+            !available && (React.createElement("span", { className: "ml-auto px-1.5 py-0.5 rounded font-bold shrink-0", style: { fontSize: '9px', background: `${statusCfg.color}22`, color: statusCfg.color } }, statusCfg.label))),
+        hasImage ? (React.createElement("div", { className: "h-24 overflow-hidden transition-opacity duration-300", style: { opacity: available ? 1 : 0.4 } },
+            React.createElement("img", { src: product.images[0], alt: product.name, className: "w-full h-full object-cover" }))) : (React.createElement("div", { className: "h-24 flex items-center justify-center transition-opacity duration-300", style: { background: `linear-gradient(135deg, ${catColor}22, transparent)`, opacity: available ? 1 : 0.4 } },
+            React.createElement(Icon, { size: 34, style: { color: catColor }, strokeWidth: 1.5 }))),
+        React.createElement("div", { className: "p-3" },
+            React.createElement("div", { className: "uppercase font-semibold mb-1 tracking-wide", style: { fontSize: '10px', color: catColor } },
+                "#",
+                product.category.replace('-', '_')),
+            React.createElement("h3", { className: "text-sm font-semibold mb-1.5 leading-snug", style: clamp2 }, product.name),
+            React.createElement("div", { className: "flex items-center gap-1.5 mb-2" },
+                React.createElement(StarRating, { rating: product.rating }),
+                React.createElement("span", { style: { fontSize: '11px', color: COLORS.muted } },
+                    product.rating,
+                    " (",
+                    product.reviews.toLocaleString('vi-VN'),
+                    ")")),
+            React.createElement("div", { className: "flex items-baseline gap-2 mb-3 flex-wrap" },
+                React.createElement("span", { className: "text-base font-bold", style: { color: COLORS.accent } }, formatVND(product.price)),
+                product.originalPrice && React.createElement("span", { className: "line-through", style: { fontSize: '11px', color: COLORS.muted } }, formatVND(product.originalPrice))),
+            manageMode ? (React.createElement(ManageControls, { product: product, onUpdateStatus: onUpdateStatus, onSetStock: onSetStock, onDelete: onDelete, onRestockDigital: onRestockDigital })) : available ? (React.createElement(React.Fragment, null,
+                product.stock <= 5 && (React.createElement("p", { style: { fontSize: '10px', color: COLORS.amber }, className: "mb-1.5" },
+                    "Ch\u1EC9 c\u00F2n ",
+                    product.stock,
+                    " s\u1EA3n ph\u1EA9m")),
+                React.createElement("div", { className: "flex gap-1.5" },
+                    product.category !== 'digital' && React.createElement("button", { onClick: (e) => { e.stopPropagation(); onAdd(product.id); }, className: "flex-1 py-2 rounded-md font-bold transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-1", style: { fontSize: '10px', background: justAdded ? 'rgba(52,211,153,0.12)' : 'transparent', color: COLORS.accent, border: `1px solid ${COLORS.accent}` } }, justAdded ? React.createElement(React.Fragment, null,
+                        React.createElement(Check, { size: 11 }),
+                        " \u0110\u00C3_TH\u00CAM") : React.createElement(React.Fragment, null,
+                        React.createElement(Plus, { size: 11 }),
+                        " TH\u00CAM_GI\u1ECE")),
+                    React.createElement("button", { onClick: (e) => { e.stopPropagation(); onBuyNow(product); }, className: "flex-1 py-2 rounded-md font-bold transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-1", style: { fontSize: '10px', background: COLORS.amber, color: '#1a1200' } },
+                        React.createElement(Zap, { size: 11 }),
+                        " MUA_NGAY")))) : (React.createElement("div", { className: "w-full py-2 rounded-md text-center font-bold", style: { fontSize: '10px', background: `${statusCfg.color}15`, border: `1px solid ${statusCfg.color}`, color: statusCfg.color } }, statusCfg.label.toUpperCase())))));
+}
+function ProductGrid({ products, onOpen, onAdd, onBuyNow, recentlyAdded, manageMode, onUpdateStatus, onSetStock, onDelete, onRestockDigital }) {
+    return (React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" }, products.map((p, i) => (React.createElement(ProductCard, { key: p.id, product: p, index: i, onOpen: onOpen, onAdd: onAdd, onBuyNow: onBuyNow, justAdded: recentlyAdded.has(p.id), manageMode: manageMode, onUpdateStatus: onUpdateStatus, onSetStock: onSetStock, onDelete: onDelete, onRestockDigital: onRestockDigital })))));
+}
+function CategorySection({ category, products, onOpen, onAdd, onBuyNow, recentlyAdded, manageMode, onUpdateStatus, onSetStock, onDelete, onRestockDigital }) {
+    const Icon = category.icon;
+    const color = CATEGORY_COLORS[category.id] || COLORS.accent;
+    if (products.length === 0)
+        return null;
+    return (React.createElement("section", { className: "mb-10" },
+        React.createElement("div", { className: "flex items-center gap-2 mb-4 pb-2", style: { borderBottom: `1px solid ${COLORS.border}` } },
+            React.createElement(Icon, { size: 16, style: { color } }),
+            React.createElement("h2", { className: "font-bold text-sm tracking-wide uppercase" }, category.name),
+            React.createElement("span", { style: { color: COLORS.muted, fontSize: '12px' } },
+                "// ",
+                products.length,
+                " s\u1EA3n ph\u1EA9m")),
+        React.createElement(ProductGrid, { products: products, onOpen: onOpen, onAdd: onAdd, onBuyNow: onBuyNow, recentlyAdded: recentlyAdded, manageMode: manageMode, onUpdateStatus: onUpdateStatus, onSetStock: onSetStock, onDelete: onDelete, onRestockDigital: onRestockDigital })));
+}
+/* -------------------------------- cart -------------------------------- */
+function CartDrawer({ open, onClose, items, onSetQty, onRemove, total, onOpenCheckout }) {
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40 transition-opacity duration-300", style: { background: 'rgba(4,6,5,0.7)', backdropFilter: 'blur(2px)', opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed top-0 right-0 h-full w-full z-50 flex flex-col transition-transform duration-300", style: { maxWidth: '420px', background: COLORS.surface, borderLeft: `1px solid ${COLORS.border}`, transform: open ? 'translateX(0)' : 'translateX(100%)' } },
+            React.createElement(TitleBar, { path: "~/cart.sh", onClose: onClose, size: 11 }),
+            items.length === 0 ? (React.createElement("div", { className: "flex-1 flex flex-col items-center justify-center px-6 text-center" },
+                React.createElement(ShoppingCart, { size: 30, style: { color: COLORS.muted }, className: "mb-3" }),
+                React.createElement("p", { className: "text-xs", style: { color: COLORS.muted } }, "$ echo $CART"),
+                React.createElement("p", { className: "text-xs", style: { color: COLORS.muted } }, "\u2192 gi\u1ECF h\u00E0ng tr\u1ED1ng"))) : (React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "flex-1 overflow-y-auto hax-scroll px-4 py-3 space-y-3" }, items.map((item) => {
+                    const Icon = item.icon;
+                    const hasImage = item.images && item.images.length > 0;
+                    return (React.createElement("div", { key: item.id, className: "flex gap-3 p-2.5 rounded-md", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("div", { className: "w-14 h-14 rounded flex items-center justify-center shrink-0 overflow-hidden", style: { background: `${CATEGORY_COLORS[item.category]}18` } }, hasImage ? React.createElement("img", { src: item.images[0], alt: "", className: "w-full h-full object-cover" }) : React.createElement(Icon, { size: 20, style: { color: CATEGORY_COLORS[item.category] } })),
+                        React.createElement("div", { className: "flex-1 min-w-0" },
+                            React.createElement("p", { className: "text-xs font-semibold mb-1 truncate" }, item.name),
+                            React.createElement("p", { className: "text-sm font-bold mb-1.5", style: { color: COLORS.accent } }, formatVND(item.price)),
+                            React.createElement("div", { className: "flex items-center gap-2" },
+                                React.createElement(QuantityInput, { value: item.qty, onChange: (v) => (v <= 0 ? onRemove(item.id) : onSetQty(item.id, v)), min: 0, max: item.stock, compact: true }),
+                                React.createElement("button", { onClick: () => onRemove(item.id), className: "ml-auto transition-colors duration-150", style: { color: COLORS.danger, fontSize: '10px' } }, "X\u00D3A")))));
+                })),
+                React.createElement("div", { className: "p-4 shrink-0", style: { borderTop: `1px solid ${COLORS.border}` } },
+                    React.createElement("div", { className: "flex items-center justify-between mb-3 text-sm" },
+                        React.createElement("span", { style: { color: COLORS.muted } }, "T\u1EA1m t\u00EDnh"),
+                        React.createElement("span", { className: "font-bold text-base", style: { color: COLORS.accent } }, formatVND(total))),
+                    React.createElement("button", { onClick: onOpenCheckout, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.accent, color: '#06120c' } },
+                        "THANH_TO\u00C1N ",
+                        React.createElement(ChevronRight, { size: 15 }))))))));
+}
+/* ----------------------------- cài đặt ngân hàng ----------------------------- */
+function BankSettingsModal({ settings, onSave, onClose }) {
+    const [bankCode, setBankCode] = useState(settings.bankCode || VIETNAM_BANKS[0].code);
+    const [accountNumber, setAccountNumber] = useState(settings.accountNumber || '');
+    const [accountName, setAccountName] = useState(settings.accountName || '');
+    const [error, setError] = useState('');
+    function handleSave() {
+        if (!accountNumber.trim() || !accountName.trim()) {
+            setError('Vui lòng nhập đầy đủ số tài khoản và tên chủ tài khoản');
+            return;
+        }
+        onSave({ bankCode, accountNumber: accountNumber.trim().replace(/\s+/g, ''), accountName: stripDiacritics(accountName.trim()).toUpperCase() });
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop", style: { maxWidth: '420px', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/settings/bank_account.sh", onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "p-5" },
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.accent } }, "$ config --set bank_account"),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Ng\u00E2n h\u00E0ng"),
+                        React.createElement("select", { value: bankCode, onChange: (e) => setBankCode(e.target.value), className: "search-input", style: inputStyle }, VIETNAM_BANKS.map((b) => (React.createElement("option", { key: b.code, value: b.code }, b.name))))),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "S\u1ED1 t\u00E0i kho\u1EA3n *"),
+                        React.createElement("input", { value: accountNumber, onChange: (e) => setAccountNumber(e.target.value), placeholder: "0123456789", className: "search-input no-spinner", style: inputStyle })),
+                    React.createElement("div", { className: "mb-2" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "T\u00EAn ch\u1EE7 t\u00E0i kho\u1EA3n *"),
+                        React.createElement("input", { value: accountName, onChange: (e) => setAccountName(e.target.value), placeholder: "NGUYEN VAN A", className: "search-input", style: { ...inputStyle, textTransform: 'uppercase' } })),
+                    React.createElement("p", { className: "mb-4", style: { fontSize: '10px', color: COLORS.muted } }, "Theo \u0111\u00FAng t\u00EAn tr\u00EAn th\u1EBB ng\u00E2n h\u00E0ng, kh\u00F4ng d\u1EA5u."),
+                    error && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                    React.createElement("button", { onClick: handleSave, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.accent, color: '#06120c' } },
+                        React.createElement(Landmark, { size: 15 }),
+                        " L\u01AFU_TH\u00D4NG_TIN"))))));
+}
+/* ----------------------------- đăng nhập ----------------------------- */
+function LoginModal({ onClose, onLogin, onRegister }) {
+    const [mode, setMode] = useState('login'); // login | register
+    const [phone, setPhone] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [error, setError] = useState('');
+    const [busy, setBusy] = useState(false);
+    async function handleSubmit() {
+        if (!phone.trim() || !password.trim() || (mode === 'register' && !name.trim())) {
+            setError('Vui lòng điền đầy đủ thông tin');
+            return;
+        }
+        setError('');
+        setBusy(true);
+        try {
+            if (mode === 'login')
+                await onLogin(phone.trim(), password);
+            else
+                await onRegister(phone.trim(), password, name.trim());
+        }
+        catch (e) {
+            setError(e.message || 'Có lỗi xảy ra');
+        }
+        finally {
+            setBusy(false);
+        }
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop", style: { maxWidth: '380px', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: mode === 'login' ? '~/auth/dang_nhap.sh' : '~/auth/dang_ky.sh', onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "p-5" },
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.accent } },
+                        "$ ",
+                        mode === 'login' ? 'auth --login' : 'auth --register'),
+                    mode === 'register' && (React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "H\u1ECD v\u00E0 t\u00EAn"),
+                        React.createElement("input", { value: name, onChange: (e) => setName(e.target.value), className: "search-input", style: inputStyle, placeholder: "Nguy\u1EC5n V\u0103n A" }))),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "S\u1ED1 \u0111i\u1EC7n tho\u1EA1i"),
+                        React.createElement("input", { value: phone, onChange: (e) => setPhone(e.target.value), className: "search-input no-spinner", style: inputStyle, placeholder: "0912 345 678" })),
+                    React.createElement("div", { className: "mb-4" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "M\u1EADt kh\u1EA9u"),
+                        React.createElement("input", { type: "password", value: password, onChange: (e) => setPassword(e.target.value), className: "search-input", style: inputStyle, placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" })),
+                    error && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                    React.createElement("button", { onClick: handleSubmit, disabled: busy, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2 mb-3", style: { background: COLORS.accent, color: '#06120c', opacity: busy ? 0.75 : 1 } }, busy ? React.createElement(Loader2, { size: 15, className: "animate-spin" }) : (mode === 'login' ? 'ĐĂNG_NHẬP' : 'ĐĂNG_KÝ')),
+                    React.createElement("button", { onClick: () => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }, className: "w-full text-center", style: { fontSize: '11px', color: COLORS.mutedLight } }, mode === 'login' ? 'Chưa có tài khoản? Đăng ký' : 'Đã có tài khoản? Đăng nhập'))))));
+}
+/* ----------------------------- ví tiền ----------------------------- */
+function WalletModal({ user, bankSettings, topup, busy, error, withdrawError, onStartTopup, onCancelTopup, onConfirmTopup, onWithdraw, onOpenHistory, onOpenDigitalOrders, digitalOrdersBadge, onNeedSellerRegistration, onClose, onLogout }) {
+    const [amount, setAmount] = useState(100000);
+    const [walletTab, setWalletTab] = useState('topup');
+    const quickAmounts = [50000, 100000, 200000, 500000];
+    const [qrError, setQrError] = useState(false);
+    const qrUrl = topup?.qrUrl || null; // do backend tạo (biến môi trường BANK_BIN/BANK_ACCOUNT_NUMBER), không liên quan bankSettings của shop
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: topup?.status === 'pending' ? undefined : onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop", style: { maxWidth: '400px', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/wallet/vi_tien.sh", onClose: topup?.status === 'pending' ? null : onClose, size: 11 }),
+                React.createElement("div", { className: "p-5" }, !topup ? (React.createElement(React.Fragment, null,
+                    React.createElement("p", { className: "text-xs mb-1", style: { color: COLORS.accent } }, "$ wallet --balance"),
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.muted } },
+                        "Xin ch\u00E0o, ",
+                        user.name || user.phone),
+                    React.createElement("div", { className: "rounded-md p-4 mb-3", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("p", { style: labelStyle, className: "mb-1" }, "S\u1ED1 d\u01B0 hi\u1EC7n t\u1EA1i"),
+                        React.createElement("p", { className: "text-2xl font-bold", style: { color: COLORS.accent } }, formatVND(user.balance || 0))),
+                    React.createElement("div", { className: "flex items-center gap-3 mb-4" },
+                        React.createElement("button", { onClick: onOpenHistory, className: "flex items-center gap-1.5 transition-colors duration-150", style: { fontSize: '11px', color: COLORS.mutedLight } },
+                            React.createElement(History, { size: 12 }),
+                            " L\u1ECBch s\u1EED giao d\u1ECBch"),
+                        React.createElement("button", { onClick: onOpenDigitalOrders, className: "relative flex items-center gap-1.5 transition-colors duration-150", style: { fontSize: '11px', color: COLORS.mutedLight } },
+                            React.createElement(Server, { size: 12 }),
+                            " \u0110\u01A1n h\u00E0ng s\u1ED1",
+                            digitalOrdersBadge > 0 && (React.createElement("span", { className: "flex items-center justify-center w-3.5 h-3.5 rounded-full font-bold", style: { fontSize: '8px', background: COLORS.danger, color: '#1a0505' } }, digitalOrdersBadge)))),
+                    React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-4" },
+                        React.createElement("button", { onClick: () => setWalletTab('topup'), className: "py-2 rounded-md text-center font-bold pill-btn flex items-center justify-center gap-1.5", style: { fontSize: '11px', background: walletTab === 'topup' ? 'rgba(52,211,153,0.12)' : COLORS.bg, border: `1px solid ${walletTab === 'topup' ? COLORS.accent : COLORS.border}`, color: walletTab === 'topup' ? COLORS.accent : COLORS.mutedLight } },
+                            React.createElement(Landmark, { size: 13 }),
+                            " N\u1EA0P_TI\u1EC0N"),
+                        React.createElement("button", { onClick: () => setWalletTab('withdraw'), className: "py-2 rounded-md text-center font-bold pill-btn flex items-center justify-center gap-1.5", style: { fontSize: '11px', background: walletTab === 'withdraw' ? 'rgba(251,191,36,0.12)' : COLORS.bg, border: `1px solid ${walletTab === 'withdraw' ? COLORS.amber : COLORS.border}`, color: walletTab === 'withdraw' ? COLORS.amber : COLORS.mutedLight } },
+                            React.createElement(ArrowUpFromLine, { size: 13 }),
+                            " R\u00DAT_TI\u1EC0N")),
+                    walletTab === 'topup' ? (React.createElement(React.Fragment, null,
+                        React.createElement("p", { style: labelStyle, className: "block mb-2" }, "Ch\u1ECDn s\u1ED1 ti\u1EC1n n\u1EA1p"),
+                        React.createElement("div", { className: "grid grid-cols-4 gap-2 mb-3" }, quickAmounts.map((a) => (React.createElement("button", { key: a, onClick: () => setAmount(a), className: "py-1.5 rounded-md text-center font-semibold pill-btn", style: { fontSize: '11px', background: amount === a ? 'rgba(52,211,153,0.12)' : COLORS.bg, border: `1px solid ${amount === a ? COLORS.accent : COLORS.border}`, color: amount === a ? COLORS.accent : COLORS.mutedLight } },
+                            (a / 1000),
+                            "K")))),
+                        React.createElement("input", { type: "number", value: amount, onChange: (e) => setAmount(Math.max(0, parseInt(e.target.value || '0', 10))), className: "search-input no-spinner mb-4", style: inputStyle, placeholder: "S\u1ED1 ti\u1EC1n tu\u1EF3 ch\u1ECDn" }),
+                        error && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                        React.createElement("button", { onClick: () => onStartTopup(amount), disabled: busy || amount < MIN_TOPUP, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2 mb-2", style: { background: COLORS.accent, color: '#06120c', opacity: busy || amount < MIN_TOPUP ? 0.6 : 1 } }, busy ? React.createElement(Loader2, { size: 15, className: "animate-spin" }) : React.createElement(React.Fragment, null,
+                            React.createElement(Landmark, { size: 15 }),
+                            " T\u1EA0O_Y\u00CAU_C\u1EA6U_N\u1EA0P")))) : (React.createElement(WithdrawPanel, { user: user, error: withdrawError, onWithdraw: onWithdraw, onNeedSellerRegistration: onNeedSellerRegistration })),
+                    React.createElement("button", { onClick: onLogout, className: "w-full text-center mt-4", style: { fontSize: '11px', color: COLORS.muted } }, "\u0110\u0103ng xu\u1EA5t"))) : topup.status === 'paid' ? (React.createElement("div", { className: "flex flex-col items-center justify-center py-6 text-center" },
+                    React.createElement("div", { className: "w-14 h-14 rounded-full flex items-center justify-center mb-4", style: { background: 'rgba(52,211,153,0.12)', border: `1px solid ${COLORS.accent}` } },
+                        React.createElement(Check, { size: 26, style: { color: COLORS.accent } })),
+                    React.createElement("p", { className: "font-bold text-base mb-1" }, "N\u1EA1p ti\u1EC1n th\u00E0nh c\u00F4ng"),
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.muted } },
+                        "\u0110\u00E3 c\u1ED9ng ",
+                        formatVND(topup.amount),
+                        " v\u00E0o v\u00ED"),
+                    React.createElement("p", { className: "font-bold mb-4", style: { color: COLORS.accent } },
+                        "S\u1ED1 d\u01B0 m\u1EDBi: ",
+                        formatVND(user.balance || 0)),
+                    React.createElement("button", { onClick: onClose, className: "px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.accent, color: '#06120c' } }, "\u0110\u00D3NG"))) : (React.createElement("div", { className: "flex flex-col items-center text-center" },
+                    React.createElement("p", { className: "text-xs mb-3", style: { color: COLORS.accent } }, "$ wallet --awaiting-transfer"),
+                    qrUrl && !qrError && (React.createElement("img", { src: qrUrl, alt: "M\u00E3 QR chuy\u1EC3n kho\u1EA3n", onError: () => setQrError(true), className: "rounded mb-3", style: { width: 160, height: 160, background: '#fff', padding: 6 } })),
+                    React.createElement("p", { className: "text-xs mb-1" },
+                        React.createElement("span", { style: { color: COLORS.muted } }, "S\u1ED1 ti\u1EC1n:"),
+                        " ",
+                        React.createElement("span", { className: "font-bold", style: { color: COLORS.accent } }, formatVND(topup.amount))),
+                    React.createElement("p", { className: "text-xs mb-4" },
+                        React.createElement("span", { style: { color: COLORS.muted } }, "N\u1ED9i dung CK (b\u1EAFt bu\u1ED9c):"),
+                        " ",
+                        React.createElement("span", { className: "font-bold", style: { color: COLORS.amber } }, topup.code)),
+                    React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.mutedLight } }, "H\u1EC7 th\u1ED1ng t\u1EF1 \u0111\u1ED9ng c\u1ED9ng ti\u1EC1n sau khi nh\u1EADn \u0111\u01B0\u1EE3c chuy\u1EC3n kho\u1EA3n (th\u01B0\u1EDDng trong v\u00E0i ph\u00FAt). B\u1EA5m n\u00FAt b\u00EAn d\u01B0\u1EDBi \u0111\u1EC3 ki\u1EC3m tra ngay."),
+                    React.createElement("button", { onClick: onConfirmTopup, className: "w-full py-2.5 rounded-md font-bold text-sm mb-2 transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.accent, color: '#06120c' } },
+                        React.createElement(Check, { size: 15 }),
+                        " KI\u1EC2M_TRA_NGAY"),
+                    React.createElement("button", { onClick: onCancelTopup, className: "px-4 py-2 rounded-md text-xs font-bold", style: { background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } }, "H\u1EE6Y"))))))));
+}
+/* ----------------------------- mục ví/nạp tiền trên trang chủ ----------------------------- */
+function WalletSection({ user, bankSettings, topup, busy, error, withdrawError, onStartTopup, onCancelTopup, onConfirmTopup, onWithdraw, onOpenHistory, onOpenDigitalOrders, digitalOrdersBadge, onNeedSellerRegistration, onLogin }) {
+    const [amount, setAmount] = useState(100000);
+    const [walletTab, setWalletTab] = useState('topup');
+    const [qrError, setQrError] = useState(false);
+    const quickAmounts = [50000, 100000, 200000, 500000];
+    const qrUrl = topup?.qrUrl || null; // do backend tạo (biến môi trường BANK_BIN/BANK_ACCOUNT_NUMBER), không liên quan bankSettings của shop
+    if (!user) {
+        return (React.createElement("section", { className: "px-4 sm:px-6 pb-6" },
+            React.createElement("div", { className: "max-w-7xl mx-auto" },
+                React.createElement("div", { className: "rounded-lg p-5 flex items-center justify-between flex-wrap gap-3", style: { background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                    React.createElement("div", { className: "flex items-center gap-3" },
+                        React.createElement(Landmark, { size: 20, style: { color: COLORS.accent } }),
+                        React.createElement("div", null,
+                            React.createElement("p", { className: "text-sm font-bold" }, "V\u00ED ROOT://SHOP"),
+                            React.createElement("p", { className: "text-xs", style: { color: COLORS.muted } }, "\u0110\u0103ng nh\u1EADp \u0111\u1EC3 xem s\u1ED1 d\u01B0 v\u00E0 n\u1EA1p ti\u1EC1n v\u00E0o v\u00ED"))),
+                    React.createElement("button", { onClick: onLogin, className: "px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.accent, color: '#06120c' } }, "\u0110\u0102NG_NH\u1EACP")))));
+    }
+    return (React.createElement("section", { className: "px-4 sm:px-6 pb-6" },
+        React.createElement("div", { className: "max-w-7xl mx-auto" },
+            React.createElement("div", { className: "rounded-lg p-5", style: { background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement("div", { className: "flex items-center gap-2 mb-4" },
+                    React.createElement(Landmark, { size: 16, style: { color: COLORS.accent } }),
+                    React.createElement("p", { className: "text-xs", style: { color: COLORS.accent } },
+                        "$ wallet --balance --user=",
+                        user.name || user.phone)),
+                !topup ? (React.createElement("div", { className: "flex flex-wrap items-start gap-5" },
+                    React.createElement("div", { className: "rounded-md p-4 flex-1", style: { minWidth: '200px', background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("p", { style: labelStyle, className: "mb-1" }, "S\u1ED1 d\u01B0 hi\u1EC7n t\u1EA1i"),
+                        React.createElement("p", { className: "text-2xl font-bold mb-2", style: { color: COLORS.accent } }, formatVND(user.balance || 0)),
+                        React.createElement("div", { className: "flex items-center gap-3" },
+                            React.createElement("button", { onClick: onOpenHistory, className: "flex items-center gap-1.5", style: { fontSize: '11px', color: COLORS.mutedLight } },
+                                React.createElement(History, { size: 12 }),
+                                " L\u1ECBch s\u1EED giao d\u1ECBch"),
+                            React.createElement("button", { onClick: onOpenDigitalOrders, className: "relative flex items-center gap-1.5", style: { fontSize: '11px', color: COLORS.mutedLight } },
+                                React.createElement(Server, { size: 12 }),
+                                " \u0110\u01A1n h\u00E0ng s\u1ED1",
+                                digitalOrdersBadge > 0 && (React.createElement("span", { className: "flex items-center justify-center w-3.5 h-3.5 rounded-full font-bold", style: { fontSize: '8px', background: COLORS.danger, color: '#1a0505' } }, digitalOrdersBadge))))),
+                    React.createElement("div", { className: "flex-1", style: { minWidth: '260px' } },
+                        React.createElement("div", { className: "grid grid-cols-2 gap-2 mb-3", style: { maxWidth: '360px' } },
+                            React.createElement("button", { onClick: () => setWalletTab('topup'), className: "py-2 rounded-md text-center font-bold pill-btn flex items-center justify-center gap-1.5", style: { fontSize: '11px', background: walletTab === 'topup' ? 'rgba(52,211,153,0.12)' : COLORS.bg, border: `1px solid ${walletTab === 'topup' ? COLORS.accent : COLORS.border}`, color: walletTab === 'topup' ? COLORS.accent : COLORS.mutedLight } },
+                                React.createElement(Landmark, { size: 13 }),
+                                " N\u1EA0P_TI\u1EC0N"),
+                            React.createElement("button", { onClick: () => setWalletTab('withdraw'), className: "py-2 rounded-md text-center font-bold pill-btn flex items-center justify-center gap-1.5", style: { fontSize: '11px', background: walletTab === 'withdraw' ? 'rgba(251,191,36,0.12)' : COLORS.bg, border: `1px solid ${walletTab === 'withdraw' ? COLORS.amber : COLORS.border}`, color: walletTab === 'withdraw' ? COLORS.amber : COLORS.mutedLight } },
+                                React.createElement(ArrowUpFromLine, { size: 13 }),
+                                " R\u00DAT_TI\u1EC0N")),
+                        walletTab === 'topup' ? (React.createElement(React.Fragment, null,
+                            React.createElement("p", { style: labelStyle, className: "block mb-2" }, "N\u1EA1p ti\u1EC1n v\u00E0o v\u00ED"),
+                            React.createElement("div", { className: "flex flex-wrap gap-2 mb-3" },
+                                quickAmounts.map((a) => (React.createElement("button", { key: a, onClick: () => setAmount(a), className: "px-3 py-1.5 rounded-md text-center font-semibold pill-btn", style: { fontSize: '11px', background: amount === a ? 'rgba(52,211,153,0.12)' : COLORS.bg, border: `1px solid ${amount === a ? COLORS.accent : COLORS.border}`, color: amount === a ? COLORS.accent : COLORS.mutedLight } },
+                                    (a / 1000),
+                                    "K"))),
+                                React.createElement("input", { type: "number", value: amount, onChange: (e) => setAmount(Math.max(0, parseInt(e.target.value || '0', 10))), className: "search-input no-spinner", style: { ...inputStyle, width: '130px' }, placeholder: "Tu\u1EF3 ch\u1ECDn" })),
+                            error && React.createElement("p", { className: "mb-2", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                            React.createElement("button", { onClick: () => onStartTopup(amount), disabled: busy || amount < MIN_TOPUP, className: "px-4 py-2 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.accent, color: '#06120c', opacity: busy || amount < MIN_TOPUP ? 0.6 : 1 } }, busy ? React.createElement(Loader2, { size: 15, className: "animate-spin" }) : React.createElement(React.Fragment, null,
+                                React.createElement(Landmark, { size: 15 }),
+                                " T\u1EA0O_Y\u00CAU_C\u1EA6U_N\u1EA0P")))) : (React.createElement("div", { style: { maxWidth: '360px' } },
+                            React.createElement(WithdrawPanel, { user: user, error: withdrawError, onWithdraw: onWithdraw, onNeedSellerRegistration: onNeedSellerRegistration })))))) : topup.status === 'paid' ? (React.createElement("div", { className: "flex items-center gap-4 flex-wrap" },
+                    React.createElement("div", { className: "w-12 h-12 rounded-full flex items-center justify-center shrink-0", style: { background: 'rgba(52,211,153,0.12)', border: `1px solid ${COLORS.accent}` } },
+                        React.createElement(Check, { size: 22, style: { color: COLORS.accent } })),
+                    React.createElement("div", null,
+                        React.createElement("p", { className: "font-bold text-sm mb-0.5" },
+                            "N\u1EA1p ti\u1EC1n th\u00E0nh c\u00F4ng \u2014 \u0111\u00E3 c\u1ED9ng ",
+                            formatVND(topup.amount)),
+                        React.createElement("p", { className: "text-xs", style: { color: COLORS.muted } },
+                            "S\u1ED1 d\u01B0 m\u1EDBi: ",
+                            React.createElement("span", { className: "font-bold", style: { color: COLORS.accent } }, formatVND(user.balance || 0)))),
+                    React.createElement("button", { onClick: onCancelTopup, className: "ml-auto px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.accent, color: '#06120c' } }, "\u0110\u00D3NG"))) : (React.createElement("div", { className: "flex items-start gap-5 flex-wrap" },
+                    qrUrl && !qrError && (React.createElement("img", { src: qrUrl, alt: "M\u00E3 QR chuy\u1EC3n kho\u1EA3n", onError: () => setQrError(true), className: "rounded shrink-0", style: { width: 130, height: 130, background: '#fff', padding: 6 } })),
+                    React.createElement("div", { className: "flex-1", style: { minWidth: '200px' } },
+                        React.createElement("p", { className: "text-xs mb-1" },
+                            React.createElement("span", { style: { color: COLORS.muted } }, "S\u1ED1 ti\u1EC1n:"),
+                            " ",
+                            React.createElement("span", { className: "font-bold", style: { color: COLORS.accent } }, formatVND(topup.amount))),
+                        React.createElement("p", { className: "text-xs mb-3" },
+                            React.createElement("span", { style: { color: COLORS.muted } }, "N\u1ED9i dung CK (b\u1EAFt bu\u1ED9c):"),
+                            " ",
+                            React.createElement("span", { className: "font-bold", style: { color: COLORS.amber } }, topup.code)),
+                        React.createElement("p", { className: "mb-2", style: { fontSize: '11px', color: COLORS.mutedLight } }, "H\u1EC7 th\u1ED1ng t\u1EF1 \u0111\u1ED9ng c\u1ED9ng ti\u1EC1n sau khi nh\u1EADn \u0111\u01B0\u1EE3c chuy\u1EC3n kho\u1EA3n (th\u01B0\u1EDDng trong v\u00E0i ph\u00FAt). B\u1EA5m KI\u1EC2M_TRA_NGAY \u0111\u1EC3 ki\u1EC3m tra li\u1EC1n."),
+                        React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+                            React.createElement("button", { onClick: onConfirmTopup, className: "px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center gap-1.5", style: { background: COLORS.accent, color: '#06120c' } },
+                                React.createElement(Check, { size: 13 }),
+                                " KI\u1EC2M_TRA_NGAY"),
+                            React.createElement("button", { onClick: onCancelTopup, className: "px-4 py-2 rounded-md text-xs font-bold", style: { background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } }, "H\u1EE6Y")))))))));
+}
+function CheckoutModal({ items, total, onClose, onConfirm, status, orderNumber, orderInfo, bankSettings, onCancelOrder, onConfirmPayment }) {
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [address, setAddress] = useState('');
+    const [payment, setPayment] = useState('cod');
+    const [error, setError] = useState('');
+    const [qrError, setQrError] = useState(false);
+    const locked = status === 'creating';
+    const awaitingPayment = status === 'awaiting_payment';
+    const hasBankInfo = !!(bankSettings && bankSettings.accountNumber);
+    const bankName = (VIETNAM_BANKS.find((b) => b.code === bankSettings?.bankCode) || {}).name || '';
+    const previewQrUrl = hasBankInfo
+        ? `https://img.vietqr.io/image/${bankSettings.bankCode}-${bankSettings.accountNumber}-qr_only.png?amount=${total}&addInfo=${encodeURIComponent('Thanh toan don hang')}&accountName=${encodeURIComponent(bankSettings.accountName)}`
+        : null;
+    // QR khi chờ thanh toán dùng mã đơn hàng (orderInfo.code) sinh cục bộ; khi nối backend thật, đổi thành mã do backend cấp để webhook khớp đúng giao dịch
+    const payQrUrl = hasBankInfo && orderInfo
+        ? `https://img.vietqr.io/image/${bankSettings.bankCode}-${bankSettings.accountNumber}-qr_only.png?amount=${orderInfo.total}&addInfo=${encodeURIComponent(orderInfo.code)}&accountName=${encodeURIComponent(bankSettings.accountName)}`
+        : null;
+    function handleConfirm() {
+        if (!name.trim() || !phone.trim() || !address.trim()) {
+            setError('Vui lòng điền đầy đủ thông tin giao hàng');
+            return;
+        }
+        if (payment === 'transfer' && !hasBankInfo) {
+            setError('Người bán chưa cập nhật thông tin ngân hàng, vui lòng chọn COD');
+            return;
+        }
+        setError('');
+        onConfirm({ name: name.trim(), phone: phone.trim(), address: address.trim(), payment });
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: locked || awaitingPayment ? undefined : onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop flex flex-col", style: { maxWidth: '520px', maxHeight: '90vh', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/checkout/thanh_toan.sh", onClose: locked || awaitingPayment ? null : onClose, size: 11 }),
+                awaitingPayment ? (React.createElement("div", { className: "flex flex-col items-center px-6 py-8 text-center" },
+                    React.createElement("p", { className: "text-xs mb-3", style: { color: COLORS.accent } }, "$ order --awaiting-transfer"),
+                    payQrUrl && !qrError && (React.createElement("img", { src: payQrUrl, alt: "M\u00E3 QR chuy\u1EC3n kho\u1EA3n", onError: () => setQrError(true), className: "rounded mb-4", style: { width: 170, height: 170, background: '#fff', padding: 6 } })),
+                    React.createElement("p", { className: "text-xs mb-1" },
+                        React.createElement("span", { style: { color: COLORS.muted } }, "S\u1ED1 ti\u1EC1n:"),
+                        " ",
+                        React.createElement("span", { className: "font-bold", style: { color: COLORS.accent } }, formatVND(orderInfo?.total || total))),
+                    React.createElement("p", { className: "text-xs mb-4" },
+                        React.createElement("span", { style: { color: COLORS.muted } }, "N\u1ED9i dung CK (b\u1EAFt bu\u1ED9c):"),
+                        " ",
+                        React.createElement("span", { className: "font-bold", style: { color: COLORS.amber } }, orderInfo?.code)),
+                    React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.mutedLight } }, "Sau khi chuy\u1EC3n kho\u1EA3n xong, b\u1EA5m x\u00E1c nh\u1EADn b\u00EAn d\u01B0\u1EDBi."),
+                    React.createElement("button", { onClick: onConfirmPayment, className: "px-4 py-2 rounded-md text-xs font-bold mb-2 transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center gap-1.5", style: { background: COLORS.accent, color: '#06120c' } },
+                        React.createElement(Check, { size: 13 }),
+                        " T\u00D4I_\u0110\u00C3_CHUY\u1EC2N_KHO\u1EA2N"),
+                    React.createElement("button", { onClick: onCancelOrder, className: "px-4 py-2 rounded-md text-xs font-bold", style: { background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } }, "H\u1EE6Y"))) : status === 'success' ? (React.createElement("div", { className: "flex flex-col items-center justify-center px-6 py-10 text-center" },
+                    React.createElement("div", { className: "w-14 h-14 rounded-full flex items-center justify-center mb-4", style: { background: 'rgba(52,211,153,0.12)', border: `1px solid ${COLORS.accent}` } },
+                        React.createElement(Check, { size: 26, style: { color: COLORS.accent } })),
+                    React.createElement("p", { className: "font-bold text-base mb-1" }, "\u0110\u1EB7t h\u00E0ng th\u00E0nh c\u00F4ng"),
+                    React.createElement("p", { className: "text-xs mb-1", style: { color: COLORS.muted } }, "$ order_id --generate"),
+                    React.createElement("p", { className: "font-bold mb-4", style: { color: COLORS.accent } }, orderNumber),
+                    React.createElement("div", { className: "w-full p-3 rounded-md mb-5 text-left", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("p", { className: "text-xs mb-1" },
+                            React.createElement("span", { style: { color: COLORS.muted } }, "Ng\u01B0\u1EDDi nh\u1EADn:"),
+                            " ",
+                            React.createElement("span", { style: { color: COLORS.mutedLight } }, name)),
+                        React.createElement("p", { className: "text-xs mb-1" },
+                            React.createElement("span", { style: { color: COLORS.muted } }, "S\u0110T:"),
+                            " ",
+                            React.createElement("span", { style: { color: COLORS.mutedLight } }, phone)),
+                        React.createElement("p", { className: "text-xs mb-1" },
+                            React.createElement("span", { style: { color: COLORS.muted } }, "\u0110\u1ECBa ch\u1EC9:"),
+                            " ",
+                            React.createElement("span", { style: { color: COLORS.mutedLight } }, address)),
+                        React.createElement("p", { className: "text-xs" },
+                            React.createElement("span", { style: { color: COLORS.muted } }, "Thanh to\u00E1n:"),
+                            " ",
+                            React.createElement("span", { style: { color: COLORS.mutedLight } }, payment === 'cod' ? 'Khi nhận hàng (COD)' : `Chuyển khoản - ${bankName}`))),
+                    React.createElement("button", { onClick: onClose, className: "px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.accent, color: '#06120c' } }, "TI\u1EBEP_T\u1EE4C_MUA_S\u1EAEM"))) : (React.createElement("div", { className: "overflow-y-auto hax-scroll p-5" },
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.accent } }, "$ checkout --review-order"),
+                    React.createElement("p", { style: labelStyle, className: "mb-2" },
+                        "\u0110\u01A1n h\u00E0ng (",
+                        items.length,
+                        " s\u1EA3n ph\u1EA9m)"),
+                    React.createElement("table", { className: "w-full mb-5", style: { borderCollapse: 'collapse' } },
+                        React.createElement("thead", null,
+                            React.createElement("tr", { style: { borderBottom: `1px solid ${COLORS.border}` } },
+                                React.createElement("th", { className: "text-left py-2", style: { color: COLORS.muted, fontSize: '10px', fontWeight: 600 } }, "S\u1EA2N PH\u1EA8M"),
+                                React.createElement("th", { className: "text-center py-2", style: { color: COLORS.muted, fontSize: '10px', fontWeight: 600 } }, "SL"),
+                                React.createElement("th", { className: "text-right py-2", style: { color: COLORS.muted, fontSize: '10px', fontWeight: 600 } }, "TH\u00C0NH TI\u1EC0N"))),
+                        React.createElement("tbody", null, items.map((item) => (React.createElement("tr", { key: item.id, style: { borderBottom: `1px solid ${COLORS.border}` } },
+                            React.createElement("td", { className: "py-2 pr-2", style: { color: COLORS.text, fontSize: '12px' } }, item.name),
+                            React.createElement("td", { className: "py-2 text-center", style: { color: COLORS.mutedLight, fontSize: '12px' } }, item.qty),
+                            React.createElement("td", { className: "py-2 text-right font-semibold", style: { color: COLORS.accent, fontSize: '12px' } }, formatVND(item.price * item.qty)))))),
+                        React.createElement("tfoot", null,
+                            React.createElement("tr", null,
+                                React.createElement("td", { colSpan: 2, className: "pt-3 font-bold", style: { color: COLORS.text, fontSize: '13px' } }, "T\u1ED5ng c\u1ED9ng"),
+                                React.createElement("td", { className: "pt-3 text-right font-bold", style: { color: COLORS.accent, fontSize: '15px' } }, formatVND(total))))),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "H\u1ECD v\u00E0 t\u00EAn *"),
+                        React.createElement("input", { value: name, onChange: (e) => setName(e.target.value), className: "search-input", style: inputStyle, placeholder: "Nguy\u1EC5n V\u0103n A" })),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "S\u1ED1 \u0111i\u1EC7n tho\u1EA1i *"),
+                        React.createElement("input", { value: phone, onChange: (e) => setPhone(e.target.value), className: "search-input", style: inputStyle, placeholder: "0912 345 678" })),
+                    React.createElement("div", { className: "mb-4" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "\u0110\u1ECBa ch\u1EC9 giao h\u00E0ng *"),
+                        React.createElement("textarea", { value: address, onChange: (e) => setAddress(e.target.value), rows: 2, className: "search-input", style: { ...inputStyle, resize: 'vertical' }, placeholder: "S\u1ED1 nh\u00E0, \u0111\u01B0\u1EDDng, ph\u01B0\u1EDDng/x\u00E3, qu\u1EADn/huy\u1EC7n, t\u1EC9nh/th\u00E0nh" })),
+                    React.createElement("div", { className: "mb-4" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-2" }, "Ph\u01B0\u01A1ng th\u1EE9c thanh to\u00E1n"),
+                        React.createElement("div", { className: "space-y-2" },
+                            React.createElement("label", { className: "flex items-center gap-2 p-2.5 rounded-md cursor-pointer transition-all duration-150", style: { background: payment === 'cod' ? 'rgba(52,211,153,0.08)' : COLORS.bg, border: `1px solid ${payment === 'cod' ? COLORS.accent : COLORS.border}` } },
+                                React.createElement("input", { type: "radio", checked: payment === 'cod', onChange: () => setPayment('cod'), style: { accentColor: COLORS.accent } }),
+                                React.createElement("span", { className: "text-xs", style: { color: COLORS.text } }, "Thanh to\u00E1n khi nh\u1EADn h\u00E0ng (COD)")),
+                            React.createElement("label", { className: "flex items-center gap-2 p-2.5 rounded-md cursor-pointer transition-all duration-150", style: { background: payment === 'transfer' ? 'rgba(52,211,153,0.08)' : COLORS.bg, border: `1px solid ${payment === 'transfer' ? COLORS.accent : COLORS.border}` } },
+                                React.createElement("input", { type: "radio", checked: payment === 'transfer', onChange: () => setPayment('transfer'), style: { accentColor: COLORS.accent } }),
+                                React.createElement("span", { className: "text-xs", style: { color: COLORS.text } }, "Chuy\u1EC3n kho\u1EA3n ng\u00E2n h\u00E0ng"))),
+                        payment === 'transfer' && (React.createElement("div", { className: "mt-3 p-3 rounded-md", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } }, hasBankInfo ? (React.createElement("div", { className: "flex gap-3 items-start flex-wrap" },
+                            !qrError && previewQrUrl && (React.createElement("img", { src: previewQrUrl, alt: "M\u00E3 QR chuy\u1EC3n kho\u1EA3n", onError: () => setQrError(true), className: "shrink-0 rounded", style: { width: 100, height: 100, background: '#fff', padding: 4 } })),
+                            React.createElement("div", { className: "flex-1 min-w-0", style: { minWidth: '160px' } },
+                                React.createElement("p", { className: "text-xs mb-1" },
+                                    React.createElement("span", { style: { color: COLORS.muted } }, "Ng\u00E2n h\u00E0ng:"),
+                                    " ",
+                                    React.createElement("span", { style: { color: COLORS.text, fontWeight: 600 } }, bankName)),
+                                React.createElement("p", { className: "text-xs mb-1" },
+                                    React.createElement("span", { style: { color: COLORS.muted } }, "S\u1ED1 TK:"),
+                                    " ",
+                                    React.createElement("span", { style: { color: COLORS.accent, fontWeight: 700 } }, bankSettings.accountNumber)),
+                                React.createElement("p", { className: "text-xs mb-1" },
+                                    React.createElement("span", { style: { color: COLORS.muted } }, "Ch\u1EE7 TK:"),
+                                    " ",
+                                    React.createElement("span", { style: { color: COLORS.text } }, bankSettings.accountName)),
+                                React.createElement("p", { className: "text-xs", style: { color: COLORS.mutedLight } }, "Qu\u00E9t m\u00E3 QR b\u1EB1ng app ng\u00E2n h\u00E0ng ho\u1EB7c chuy\u1EC3n kho\u1EA3n th\u1EE7 c\u00F4ng theo th\u00F4ng tin tr\u00EAn.")))) : (React.createElement("p", { className: "text-xs", style: { color: COLORS.muted } }, "Ng\u01B0\u1EDDi b\u00E1n ch\u01B0a c\u1EADp nh\u1EADt th\u00F4ng tin ng\u00E2n h\u00E0ng. Vui l\u00F2ng ch\u1ECDn thanh to\u00E1n khi nh\u1EADn h\u00E0ng (COD)."))))),
+                    error && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                    React.createElement("button", { onClick: handleConfirm, disabled: locked, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.accent, color: '#06120c', opacity: locked ? 0.75 : 1 } }, locked ? React.createElement(React.Fragment, null,
+                        React.createElement(Loader2, { size: 15, className: "animate-spin" }),
+                        " \u0110ANG_T\u1EA0O_\u0110\u01A0N") : React.createElement(React.Fragment, null, "X\u00C1C_NH\u1EACN_\u0110\u1EB6T_H\u00C0NG"))))))));
+}
+/* ------------------------------- modal ------------------------------- */
+function ProductModal({ product, onClose, onAdd, onBuyNow, justAdded, manageMode, onUpdateStatus, onSetStock, onDelete, onRestockDigital, onAddImages, onRemoveImage, userVote, onVote, comments, onAddComment }) {
+    const [activeImg, setActiveImg] = useState(0);
+    const Icon = product.icon;
+    const catColor = CATEGORY_COLORS[product.category];
+    const statusCfg = STATUS_CONFIG[product.status];
+    const available = product.status === 'in-stock' && product.stock > 0;
+    const images = product.images || [];
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop flex flex-col", style: { maxWidth: '560px', maxHeight: '90vh', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: `~/${product.category}/${product.code}.json`, onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "overflow-y-auto hax-scroll" },
+                    images.length > 0 ? (React.createElement("div", { className: "h-44 overflow-hidden", style: { background: COLORS.bg } },
+                        React.createElement("img", { src: images[Math.min(activeImg, images.length - 1)], alt: product.name, className: "w-full h-full object-cover" }))) : (React.createElement("div", { className: "h-40 flex items-center justify-center transition-opacity duration-300", style: { background: `linear-gradient(135deg, ${catColor}25, transparent)`, opacity: available ? 1 : 0.4 } },
+                        React.createElement(Icon, { size: 50, style: { color: catColor }, strokeWidth: 1.3 }))),
+                    React.createElement("div", { className: "p-5" },
+                        !manageMode && images.length > 1 && (React.createElement("div", { className: "flex gap-1.5 mb-4 overflow-x-auto no-scrollbar" }, images.map((img, i) => (React.createElement("button", { key: i, onClick: () => setActiveImg(i), className: "shrink-0 rounded overflow-hidden", style: { width: 48, height: 48, border: i === activeImg ? `2px solid ${COLORS.accent}` : `1px solid ${COLORS.border}` } },
+                            React.createElement("img", { src: img, alt: "", className: "w-full h-full object-cover" })))))),
+                        manageMode && (React.createElement("div", { className: "mb-4" },
+                            React.createElement(ImageManager, { productId: product.id, images: images, onAdd: onAddImages, onRemove: onRemoveImage }))),
+                        React.createElement("div", { className: "flex items-center justify-between mb-2 flex-wrap gap-1.5" },
+                            React.createElement("span", { className: "uppercase font-semibold tracking-wide", style: { fontSize: '11px', color: catColor } },
+                                "#",
+                                product.category.replace('-', '_'),
+                                " \u00B7 ",
+                                product.code),
+                            React.createElement("span", { className: "px-2 py-0.5 rounded font-bold", style: { fontSize: '10px', background: `${statusCfg.color}18`, color: statusCfg.color } },
+                                statusCfg.label,
+                                " \u00B7 ",
+                                product.stock,
+                                " c\u00F2n l\u1EA1i")),
+                        React.createElement("h2", { className: "text-xl font-bold mb-2" }, product.name),
+                        React.createElement("div", { className: "flex items-center gap-2 mb-3" },
+                            React.createElement(StarRating, { rating: product.rating }),
+                            React.createElement("span", { style: { fontSize: '12px', color: COLORS.muted } },
+                                product.rating,
+                                " \u00B7 ",
+                                product.reviews.toLocaleString('vi-VN'),
+                                " \u0111\u00E1nh gi\u00E1")),
+                        React.createElement("div", { className: "flex items-center gap-2 mb-4" },
+                            React.createElement("button", { onClick: () => onVote(product.id, 'like'), className: "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 hover:brightness-110 active:scale-95", style: userVote === 'like' ? { background: 'rgba(52,211,153,0.15)', border: `1px solid ${COLORS.accent}`, color: COLORS.accent } : { background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } },
+                                React.createElement(ThumbsUp, { size: 13, fill: userVote === 'like' ? COLORS.accent : 'none' }),
+                                " ",
+                                product.likes),
+                            React.createElement("button", { onClick: () => onVote(product.id, 'dislike'), className: "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 hover:brightness-110 active:scale-95", style: userVote === 'dislike' ? { background: 'rgba(248,113,113,0.15)', border: `1px solid ${COLORS.danger}`, color: COLORS.danger } : { background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } },
+                                React.createElement(ThumbsDown, { size: 13, fill: userVote === 'dislike' ? COLORS.danger : 'none' }),
+                                " ",
+                                product.dislikes)),
+                        React.createElement("p", { className: "text-sm mb-5 leading-relaxed", style: { color: COLORS.mutedLight } }, product.desc),
+                        React.createElement("div", { className: "rounded-md p-3 mb-5", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                            React.createElement("p", { className: "mb-2", style: { fontSize: '10px', color: COLORS.muted } }, "// th\u00F4ng s\u1ED1 k\u1EF9 thu\u1EADt"),
+                            React.createElement("div", { className: "space-y-1.5" }, product.specs.map((spec, i) => (React.createElement("p", { key: i, className: "text-xs", style: { color: COLORS.mutedLight } },
+                                React.createElement("span", { style: { color: COLORS.accent } }, '›'),
+                                " ",
+                                spec))))),
+                        React.createElement("div", { className: "flex items-baseline gap-2 flex-wrap mb-4" },
+                            React.createElement("span", { className: "text-xl font-bold", style: { color: COLORS.accent } }, formatVND(product.price)),
+                            product.originalPrice && React.createElement("span", { className: "line-through text-sm", style: { color: COLORS.muted } }, formatVND(product.originalPrice))),
+                        manageMode ? (React.createElement("div", { className: "mb-5" },
+                            React.createElement(ManageControls, { product: product, onUpdateStatus: onUpdateStatus, onSetStock: onSetStock, onDelete: onDelete, onRestockDigital: onRestockDigital }))) : available ? (React.createElement("div", { className: "flex gap-2 w-full mb-5" },
+                            product.category !== 'digital' && React.createElement("button", { onClick: () => onAdd(product.id), className: "flex-1 px-4 py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: justAdded ? 'rgba(52,211,153,0.12)' : 'transparent', color: COLORS.accent, border: `1px solid ${COLORS.accent}` } }, justAdded ? React.createElement(React.Fragment, null,
+                                React.createElement(Check, { size: 15 }),
+                                " \u0110\u00C3_TH\u00CAM") : React.createElement(React.Fragment, null,
+                                React.createElement(Plus, { size: 15 }),
+                                " TH\u00CAM_GI\u1ECE")),
+                            React.createElement("button", { onClick: () => onBuyNow(product), className: "flex-1 px-4 py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.amber, color: '#1a1200' } },
+                                React.createElement(Zap, { size: 15 }),
+                                " MUA_NGAY"))) : (React.createElement("div", { className: "w-full py-2.5 rounded-md text-center font-bold text-sm mb-5", style: { background: `${statusCfg.color}15`, border: `1px solid ${statusCfg.color}`, color: statusCfg.color } }, statusCfg.label.toUpperCase())),
+                        React.createElement("div", { style: { borderTop: `1px solid ${COLORS.border}`, paddingTop: '16px' } },
+                            React.createElement(CommentsSection, { productId: product.id, comments: comments, onAdd: onAddComment }))))))));
+}
+/* ----------------------------- mua ngay ----------------------------- */
+function QuickBuyModal({ product, balance, onClose, onConfirmPurchase, onGoTopup }) {
+    const [qty, setQty] = useState(1);
+    const [status, setStatus] = useState('idle'); // idle | processing | success | rejected
+    const [orderNumber, setOrderNumber] = useState('');
+    const [isDigitalResult, setIsDigitalResult] = useState(false);
+    const [deliveryInfo, setDeliveryInfo] = useState('');
+    const [rejectReason, setRejectReason] = useState('insufficient');
+    const Icon = product.icon;
+    const catColor = CATEGORY_COLORS[product.category];
+    const hasImage = product.images && product.images.length > 0;
+    const total = product.price * qty;
+    const insufficientBalance = total > (balance || 0);
+    const locked = status === 'processing';
+    function handleConfirm() {
+        if (insufficientBalance) {
+            setRejectReason('insufficient');
+            setStatus('rejected');
+            return;
+        }
+        setStatus('processing');
+        setTimeout(async () => {
+            const result = await onConfirmPurchase(product, qty);
+            if (result && result.ok) {
+                setOrderNumber(result.orderNumber);
+                setIsDigitalResult(!!result.digital);
+                setDeliveryInfo(result.deliveryInfo || '');
+                setStatus('success');
+            }
+            else {
+                setRejectReason((result && result.reason) || 'insufficient');
+                setStatus('rejected');
+            }
+        }, 600);
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: locked ? undefined : onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop", style: { maxWidth: '400px', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/checkout/mua_ngay.sh", onClose: locked ? null : onClose, size: 11 }),
+                status === 'success' ? (React.createElement("div", { className: "flex flex-col items-center justify-center px-6 py-8 text-center" },
+                    React.createElement("div", { className: "w-14 h-14 rounded-full flex items-center justify-center mb-4", style: { background: 'rgba(251,191,36,0.12)', border: `1px solid ${COLORS.amber}` } },
+                        React.createElement(Check, { size: 26, style: { color: COLORS.amber } })),
+                    React.createElement("p", { className: "font-bold text-base mb-1" }, "Mua hàng thành công"),
+                    React.createElement("p", { className: "text-xs mb-1", style: { color: COLORS.muted } }, "$ order_id --generate"),
+                    React.createElement("p", { className: "font-bold mb-3", style: { color: COLORS.amber } }, orderNumber),
+                    isDigitalResult && (React.createElement("div", { className: "w-full rounded p-3 mb-3 text-left", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("p", { style: labelStyle, className: "mb-1" }, "Thông tin sản phẩm (tự động giao)"),
+                        React.createElement("p", { className: "text-xs whitespace-pre-wrap", style: { color: COLORS.text } }, deliveryInfo))),
+                    React.createElement("p", { className: "text-xs mb-6", style: { color: COLORS.muted } }, isDigitalResult
+                        ? `Đã trừ ${formatVND(total)} từ ví. Tiền tạm giữ ${DIGITAL_HOLD_HOURS / 24} ngày cho người bán \u2014 xem lại thông tin này bất cứ lúc nào trong mục Đơn Hàng Số.`
+                        : `Đã trừ ${formatVND(total)} từ ví \u2014 số dư còn lại ${formatVND(balance || 0)}`),
+                    React.createElement("button", { onClick: onClose, className: "px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.amber, color: '#1a1200' } }, "TIẾP_TỤC_MUA_SẮM"))) : status === 'rejected' ? (React.createElement("div", { className: "flex flex-col items-center justify-center px-6 py-10 text-center" },
+                    React.createElement("div", { className: "w-14 h-14 rounded-full flex items-center justify-center mb-4", style: { background: 'rgba(248,113,113,0.12)', border: `1px solid ${COLORS.danger}` } },
+                        React.createElement(X, { size: 26, style: { color: COLORS.danger } })),
+                    React.createElement("p", { className: "font-bold text-base mb-1", style: { color: COLORS.danger } }, "Giao dịch bị từ chối"),
+                    React.createElement("p", { className: "text-xs mb-6", style: { color: COLORS.muted } }, rejectReason === 'out_of_stock' ? "Kho sản phẩm đã hết hàng, vui lòng quay lại sau." : "Số dư ví không đủ để thanh toán đơn hàng này."),
+                    React.createElement("div", { className: "flex gap-2 w-full" },
+                        React.createElement("button", { onClick: () => setStatus('idle'), className: "flex-1 py-2.5 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } }, "QUAY_LẠI"),
+                        rejectReason !== 'out_of_stock' && React.createElement("button", { onClick: onGoTopup, className: "flex-1 py-2.5 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-1.5", style: { background: COLORS.accent, color: '#06120c' } },
+                            React.createElement(Landmark, { size: 13 }),
+                            " NẠP_TIỀN")))) : (React.createElement("div", { className: "p-5" },
+                    React.createElement("div", { className: "flex gap-3 mb-4" },
+                        React.createElement("div", { className: "w-16 h-16 rounded flex items-center justify-center shrink-0 overflow-hidden", style: { background: `${catColor}18` } }, hasImage ? React.createElement("img", { src: product.images[0], alt: "", className: "w-full h-full object-cover" }) : React.createElement(Icon, { size: 26, style: { color: catColor } })),
+                        React.createElement("div", { className: "min-w-0" },
+                            React.createElement("p", { className: "text-sm font-semibold mb-1", style: clamp2 }, product.name),
+                            React.createElement("p", { className: "text-base font-bold", style: { color: COLORS.accent } }, formatVND(product.price)))),
+                    React.createElement("div", { className: "flex items-center justify-between mb-4 p-3 rounded-md", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("span", { className: "text-xs", style: { color: COLORS.mutedLight } },
+                            "S\u1ED1 l\u01B0\u1EE3ng ",
+                            React.createElement("span", { style: { color: COLORS.muted } },
+                                "(c\u00F2n ",
+                                product.stock,
+                                ")")),
+                        React.createElement(QuantityInput, { value: qty, onChange: (v) => setQty(Math.max(1, Math.min(product.stock, v))), min: 1, max: product.stock })),
+                    React.createElement("div", { className: "flex items-center justify-between mb-1.5 text-sm" },
+                        React.createElement("span", { style: { color: COLORS.muted } }, "Tổng cộng"),
+                        React.createElement("span", { className: "font-bold text-lg", style: { color: COLORS.accent } }, formatVND(total))),
+                    React.createElement("div", { className: "flex items-center justify-between mb-4 text-xs" },
+                        React.createElement("span", { style: { color: COLORS.muted } }, "Số dư ví"),
+                        React.createElement("span", { className: "font-semibold", style: { color: insufficientBalance ? COLORS.danger : COLORS.mutedLight } }, formatVND(balance || 0))),
+                    insufficientBalance && (React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, "Số dư không đủ \u2014 vui lòng nạp thêm tiền vào ví trước khi mua.")),
+                    React.createElement("button", { onClick: handleConfirm, disabled: locked, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.amber, color: '#1a1200', opacity: locked ? 0.75 : 1 } }, locked ? React.createElement(React.Fragment, null,
+                        React.createElement(Loader2, { size: 15, className: "animate-spin" }),
+                        " \u0110ANG_X\u1EEC_L\u00DD") : React.createElement(React.Fragment, null,
+                        React.createElement(Zap, { size: 15 }),
+                        " X\u00C1C_NH\u1EACN_MUA"))))))));
+}
+/* --------------------------- đăng bán sản phẩm --------------------------- */
+function AddProductModal({ onClose, onSubmit }) {
+    const [name, setName] = useState('');
+    const [category, setCategory] = useState(CATEGORIES[1].id);
+    const [price, setPrice] = useState('');
+    const [stock, setStock] = useState('');
+    const [stockPoolText, setStockPoolText] = useState('');
+    const [code, setCode] = useState('');
+    const [desc, setDesc] = useState('');
+    const [specsText, setSpecsText] = useState('');
+    const [error, setError] = useState('');
+    const isDigital = category === 'digital';
+    const stockPoolLines = stockPoolText.split('\n').map((s) => s.trim()).filter(Boolean);
+    function handleSubmit() {
+        if (!name.trim()) {
+            setError('Vui lòng nhập tên sản phẩm');
+            return;
+        }
+        if (!price || Number(price) <= 0) {
+            setError('Vui lòng nhập giá hợp lệ');
+            return;
+        }
+        if (isDigital) {
+            if (stockPoolLines.length === 0) {
+                setError('Vui lòng nhập ít nhất 1 dòng thông tin sản phẩm (mỗi dòng sẽ tự động giao cho 1 lượt mua)');
+                return;
+            }
+        }
+        else if (stock === '' || Number(stock) < 0) {
+            setError('Vui lòng nhập số lượng hợp lệ');
+            return;
+        }
+        onSubmit({
+            name: name.trim(),
+            category,
+            price: Number(price),
+            stock: isDigital ? stockPoolLines.length : Number(stock),
+            stockPool: isDigital ? stockPoolLines : undefined,
+            code: code.trim(),
+            desc: desc.trim(),
+            specs: specsText.split('\n').map((s) => s.trim()).filter(Boolean),
+        });
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop flex flex-col", style: { maxWidth: '480px', maxHeight: '90vh', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/products/new_listing.sh", onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "overflow-y-auto hax-scroll p-5" },
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.accent } }, "$ post_product --create"),
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.muted } }, "\u1EA2nh s\u1EA3n ph\u1EA9m c\u00F3 th\u1EC3 th\u00EAm sau khi \u0111\u0103ng, trong ch\u1EBF \u0111\u1ED9 qu\u1EA3n l\u00FD."),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "T\u00EAn s\u1EA3n ph\u1EA9m *"),
+                        React.createElement("input", { value: name, onChange: (e) => setName(e.target.value), placeholder: "VD: B\u00E0n ph\u00EDm c\u01A1 mini 60%", className: "search-input", style: inputStyle })),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Danh m\u1EE5c"),
+                        React.createElement("select", { value: category, onChange: (e) => setCategory(e.target.value), className: "search-input", style: inputStyle }, CATEGORIES.filter((c) => c.id !== 'all').map((c) => (React.createElement("option", { key: c.id, value: c.id }, c.name))))),
+                    React.createElement("div", { className: "flex gap-2 mb-3" },
+                        React.createElement("div", { className: "flex-1" },
+                            React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Gi\u00E1 (\u20AB) *"),
+                            React.createElement("input", { type: "number", value: price, onChange: (e) => setPrice(e.target.value), placeholder: "299000", className: "search-input no-spinner", style: inputStyle })),
+                        !isDigital && React.createElement("div", { className: "flex-1" },
+                            React.createElement("label", { style: labelStyle, className: "block mb-1" }, "S\u1ED1 l\u01B0\u1EE3ng *"),
+                            React.createElement("input", { type: "number", value: stock, onChange: (e) => setStock(e.target.value), placeholder: "10", className: "search-input no-spinner", style: inputStyle }))),
+                    isDigital && React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, `Kho sản phẩm — mỗi dòng 1 sản phẩm, tự động giao khi có người mua (hiện có ${stockPoolLines.length} dòng)`),
+                        React.createElement("textarea", { value: stockPoolText, onChange: (e) => setStockPoolText(e.target.value), rows: 5, placeholder: "vd: user01@gmail.com | matkhau123 | ghi ch\u00FA\nvd: 123.45.67.89 | root | matkhau456", className: "search-input", style: { ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: '12px' } }),
+                        React.createElement("p", { className: "mt-1", style: { fontSize: '10px', color: COLORS.muted } }, "Sau khi \u0111\u0103ng, b\u1EA1n c\u00F3 th\u1EC3 nh\u1EADp th\u00EAm kho t\u1EEB trang qu\u1EA3n l\u00FD s\u1EA3n ph\u1EA9m.")),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "M\u00E3 s\u1EA3n ph\u1EA9m"),
+                        React.createElement("input", { value: code, onChange: (e) => setCode(e.target.value), placeholder: "\u0110\u1EC3 tr\u1ED1ng s\u1EBD t\u1EF1 t\u1EA1o", className: "search-input", style: inputStyle })),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "M\u00F4 t\u1EA3"),
+                        React.createElement("textarea", { value: desc, onChange: (e) => setDesc(e.target.value), rows: 2, placeholder: "M\u00F4 t\u1EA3 ng\u1EAFn v\u1EC1 s\u1EA3n ph\u1EA9m...", className: "search-input", style: { ...inputStyle, resize: 'vertical' } })),
+                    React.createElement("div", { className: "mb-4" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Th\u00F4ng s\u1ED1 (m\u1ED7i d\u00F2ng m\u1ED9t m\u1EE5c)"),
+                        React.createElement("textarea", { value: specsText, onChange: (e) => setSpecsText(e.target.value), rows: 3, placeholder: 'Màu sắc: Đen\nBảo hành: 12 tháng', className: "search-input", style: { ...inputStyle, resize: 'vertical' } })),
+                    error && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                    React.createElement("button", { onClick: handleSubmit, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.amber, color: '#1a1200' } },
+                        React.createElement(Plus, { size: 15 }),
+                        " \u0110\u0102NG_B\u00C1N_S\u1EA2N_PH\u1EA8M"))))));
+}
+/* ----------------------------- rút tiền ----------------------------- */
+function WithdrawPanel({ user, error, onWithdraw, onNeedSellerRegistration }) {
+    const [amount, setAmount] = useState(0);
+    const [bankCode, setBankCode] = useState((user.withdrawBank && user.withdrawBank.bankCode) || VIETNAM_BANKS[0].code);
+    const [accountNumber, setAccountNumber] = useState((user.withdrawBank && user.withdrawBank.accountNumber) || '');
+    const [accountName, setAccountName] = useState((user.withdrawBank && user.withdrawBank.accountName) || '');
+    const [localError, setLocalError] = useState('');
+    const [done, setDone] = useState(null);
+    const balance = user.balance || 0;
+    if (!user.seller) {
+        return (React.createElement("div", { className: "rounded-md p-4 text-center", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+            React.createElement(ShieldCheck, { size: 22, style: { color: COLORS.amber }, className: "mx-auto mb-2" }),
+            React.createElement("p", { className: "text-xs mb-3", style: { color: COLORS.mutedLight } }, "Bạn cần đăng ký thông tin người bán (CCCD/CMND + số điện thoại) trước khi có thể rút tiền."),
+            React.createElement("button", { onClick: onNeedSellerRegistration, className: "px-4 py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.amber, color: '#1a1200' } }, "ĐĂNG_KÝ_NGƯỜI_BÁN")));
+    }
+    if (done) {
+        return (React.createElement("div", { className: "rounded-md p-4 text-center", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+            React.createElement("div", { className: "w-11 h-11 rounded-full flex items-center justify-center mb-2 mx-auto", style: { background: 'rgba(52,211,153,0.12)', border: `1px solid ${COLORS.accent}` } },
+                React.createElement(Check, { size: 20, style: { color: COLORS.accent } })),
+            React.createElement("p", { className: "font-bold text-sm mb-1" }, "Đã gửi yêu cầu rút tiền"),
+            React.createElement("p", { className: "text-xs mb-3", style: { color: COLORS.muted } },
+                "Đã tạm trừ ",
+                formatVND(done.amount),
+                " từ ví. Khoản tiền sẽ được xử lý và chuyển khoản trong thời gian sớm nhất."),
+            React.createElement("button", { onClick: () => setDone(null), className: "px-4 py-2 rounded-md text-xs font-bold", style: { background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } }, "TẠO_YÊU_CẦU_KHÁC")));
+    }
+    function handleSubmit() {
+        if (!amount || amount < MIN_WITHDRAW) {
+            setLocalError(`Số tiền rút tối thiểu là ${formatVND(MIN_WITHDRAW)}`);
+            return;
+        }
+        if (amount > balance) {
+            setLocalError('Số dư không đủ để rút số tiền này');
+            return;
+        }
+        if (!accountNumber.trim() || !accountName.trim()) {
+            setLocalError('Vui lòng nhập đầy đủ thông tin tài khoản nhận tiền');
+            return;
+        }
+        setLocalError('');
+        onWithdraw({ amount, bankCode, accountNumber: accountNumber.trim().replace(/\s+/g, ''), accountName: stripDiacritics(accountName.trim()).toUpperCase() });
+        setDone({ amount });
+    }
+    return (React.createElement("div", null,
+        React.createElement("p", { style: labelStyle, className: "block mb-2" }, "Số tiền muốn rút"),
+        React.createElement("div", { className: "flex gap-2 mb-2" },
+            React.createElement("input", { type: "number", value: amount || '', onChange: (e) => setAmount(Math.max(0, parseInt(e.target.value || '0', 10))), className: "search-input no-spinner", style: inputStyle, placeholder: `Tối thiểu ${formatVND(MIN_WITHDRAW)}` }),
+            React.createElement("button", { onClick: () => setAmount(balance), className: "px-3 rounded-md font-semibold shrink-0", style: { fontSize: '10px', background: COLORS.bg, border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } }, "TẤT_CẢ")),
+        React.createElement("p", { className: "mb-3", style: { fontSize: '10px', color: COLORS.muted } },
+            "Số dư khả dụng: ",
+            formatVND(balance)),
+        React.createElement("div", { className: "mb-3" },
+            React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Ngân hàng nhận tiền"),
+            React.createElement("select", { value: bankCode, onChange: (e) => setBankCode(e.target.value), className: "search-input", style: inputStyle }, VIETNAM_BANKS.map((b) => (React.createElement("option", { key: b.code, value: b.code }, b.name))))),
+        React.createElement("div", { className: "mb-3" },
+            React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Số tài khoản"),
+            React.createElement("input", { value: accountNumber, onChange: (e) => setAccountNumber(e.target.value), placeholder: "0123456789", className: "search-input no-spinner", style: inputStyle })),
+        React.createElement("div", { className: "mb-3" },
+            React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Tên chủ tài khoản"),
+            React.createElement("input", { value: accountName, onChange: (e) => setAccountName(e.target.value), placeholder: "NGUYEN VAN A", className: "search-input", style: { ...inputStyle, textTransform: 'uppercase' } })),
+        (localError || error) && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, localError || error),
+        React.createElement("button", { onClick: handleSubmit, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.amber, color: '#1a1200' } },
+            React.createElement(ArrowUpFromLine, { size: 15 }),
+            " GỬI_YÊU_CẦU_RÚT")));
+}
+/* ------------------------- xác minh người bán ------------------------- */
+function SellerRegistrationModal({ user, onClose, onSubmit }) {
+    const [idCardNumber, setIdCardNumber] = useState('');
+    const [phone, setPhone] = useState((user && user.phone) || '');
+    const [error, setError] = useState('');
+    function handleSubmit() {
+        const idDigits = idCardNumber.replace(/\D/g, '');
+        const phoneDigits = normalizePhone(phone);
+        if (!validIdCardNumber(idDigits)) {
+            setError('Số CCCD/CMND không hợp lệ (9 hoặc 12 số)');
+            return;
+        }
+        if (phoneDigits.length < 9) {
+            setError('Số điện thoại không hợp lệ');
+            return;
+        }
+        setError('');
+        onSubmit({ idCardNumber: idDigits, phone: phoneDigits });
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop", style: { maxWidth: '400px', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/seller/xac_minh_nguoi_ban.sh", onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "p-5" },
+                    React.createElement("div", { className: "flex items-center gap-2 mb-3" },
+                        React.createElement(ShieldCheck, { size: 18, style: { color: COLORS.amber } }),
+                        React.createElement("p", { className: "text-xs font-bold" }, "Xác minh người bán")),
+                    React.createElement("p", { className: "text-xs mb-4", style: { color: COLORS.muted } }, "Theo quy định, người bán cần xác minh CCCD/CMND và số điện thoại trước khi đăng sản phẩm hoặc rút tiền. Thông tin của bạn được bảo mật và chỉ dùng cho mục đích xác minh."),
+                    React.createElement("div", { className: "mb-3" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Số CCCD / CMND *"),
+                        React.createElement("input", { value: idCardNumber, onChange: (e) => setIdCardNumber(e.target.value), placeholder: "0xxxxxxxxxxx", className: "search-input no-spinner", style: inputStyle })),
+                    React.createElement("div", { className: "mb-4" },
+                        React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Số điện thoại liên hệ *"),
+                        React.createElement("input", { value: phone, onChange: (e) => setPhone(e.target.value), placeholder: "0912 345 678", className: "search-input no-spinner", style: inputStyle })),
+                    error && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                    React.createElement("button", { onClick: handleSubmit, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.amber, color: '#1a1200' } },
+                        React.createElement(ShieldCheck, { size: 15 }),
+                        " XÁC_NHẬN_ĐĂNG_KÝ"))))));
+}
+/* ----------------------------- lịch sử giao dịch ----------------------------- */
+function TransactionHistoryModal({ transactions, onClose }) {
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop flex flex-col", style: { maxWidth: '440px', maxHeight: '80vh', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/wallet/lich_su_giao_dich.sh", onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "p-5 overflow-y-auto" }, transactions.length === 0 ? (React.createElement("p", { className: "text-xs text-center py-8", style: { color: COLORS.muted } }, "Chưa có giao dịch nào.")) : (React.createElement("div", { className: "flex flex-col gap-2" }, transactions.map((tx) => {
+                    const typeMeta = TX_TYPE_META[tx.type] || { label: tx.type, icon: Package };
+                    const statusMeta = TX_STATUS_META[tx.status] || { label: tx.status, color: COLORS.mutedLight };
+                    const TypeIcon = typeMeta.icon;
+                    return (React.createElement("div", { key: tx.id, className: "rounded-md p-3", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("div", { className: "flex items-center justify-between gap-2 mb-1" },
+                            React.createElement("div", { className: "flex items-center gap-1.5 min-w-0" },
+                                React.createElement(TypeIcon, { size: 13, style: { color: COLORS.mutedLight }, className: "shrink-0" }),
+                                React.createElement("span", { className: "text-xs font-semibold truncate" }, typeMeta.label)),
+                            React.createElement("span", { className: "font-bold text-sm shrink-0", style: { color: tx.direction === 'in' ? COLORS.accent : COLORS.danger } },
+                                tx.direction === 'in' ? '+' : '-',
+                                formatVND(tx.amount))),
+                        React.createElement("p", { className: "mb-1.5", style: { fontSize: '11px', color: COLORS.mutedLight } }, tx.description),
+                        React.createElement("div", { className: "flex items-center justify-between" },
+                            React.createElement("span", { style: { fontSize: '10px', color: COLORS.muted } }, formatDateTime(tx.time)),
+                            React.createElement("span", { className: "px-1.5 py-0.5 rounded font-bold", style: { fontSize: '9px', background: `${statusMeta.color}22`, color: statusMeta.color } }, statusMeta.label))));
+                }))))))));
+}
+/* ------------------------- quản lý duyệt rút tiền ------------------------- */
+function WithdrawalAdminModal({ requests, onApprove, onReject, onClose }) {
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop flex flex-col", style: { maxWidth: '460px', maxHeight: '80vh', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/admin/duyet_rut_tien.sh", onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "p-5 overflow-y-auto" }, requests.length === 0 ? (React.createElement("p", { className: "text-xs text-center py-8", style: { color: COLORS.muted } }, "Không có yêu cầu rút tiền nào đang chờ duyệt.")) : (React.createElement("div", { className: "flex flex-col gap-2" }, requests.map((req) => {
+                    const bank = VIETNAM_BANKS.find((b) => b.code === (req.meta && req.meta.bankCode));
+                    return (React.createElement("div", { key: req.id, className: "rounded-md p-3", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+                        React.createElement("div", { className: "flex items-center justify-between mb-1.5" },
+                            React.createElement("span", { className: "text-xs font-semibold" }, req.phone),
+                            React.createElement("span", { className: "font-bold text-sm", style: { color: COLORS.amber } }, formatVND(req.amount))),
+                        React.createElement("p", { className: "mb-0.5", style: { fontSize: '11px', color: COLORS.mutedLight } },
+                            bank ? bank.name : 'Ngân hàng',
+                            " \u2014 ",
+                            req.meta && req.meta.accountNumber,
+                            " (",
+                            req.meta && req.meta.accountName,
+                            ")"),
+                        React.createElement("p", { className: "mb-2", style: { fontSize: '10px', color: COLORS.muted } }, formatDateTime(req.time)),
+                        React.createElement("div", { className: "flex gap-2" },
+                            React.createElement("button", { onClick: () => onApprove(req.phone, req.id), className: "flex-1 py-1.5 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-1", style: { background: COLORS.accent, color: '#06120c' } },
+                                React.createElement(Check, { size: 12 }),
+                                " \u0110\u00C3_CHUY\u1EC2N"),
+                            React.createElement("button", { onClick: () => onReject(req.phone, req.id), className: "flex-1 py-1.5 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-1", style: { background: 'transparent', border: `1px solid ${COLORS.danger}`, color: COLORS.danger } },
+                                React.createElement(X, { size: 12 }),
+                                " T\u1EEA_CH\u1ED0I"))));
+                }))))))));
+}
+/* ------------------------- đơn hàng số (kho tự động) ------------------------- *
+ * Sản phẩm số (VPS, tài khoản thuê...) dùng kiểu "kho hàng tự động" giống GC MMO /
+ * Tạp Hoá MMO: người bán nhập sẵn kho tài khoản, hệ thống tự động giao 1 dòng ngay khi
+ * mua (không cần người bán thao tác) → tiền tạm giữ DIGITAL_HOLD_HOURS giờ → tự động
+ * chuyển cho người bán (trừ 20% chiết khấu sàn) trừ khi người mua xác nhận sớm hơn hoặc
+ * gửi khiếu nại để admin (chế độ quản lý) phân xử.
+ * ------------------------------------------------------------------------- */
+function DigitalOrdersModal({ currentUserPhone, manageMode, orders, onConfirmReceipt, onDispute, onResolveDispute, onClose }) {
+    const [tab, setTab] = useState('buying');
+    const [disputingId, setDisputingId] = useState(null);
+    const [disputeDrafts, setDisputeDrafts] = useState({});
+    const myPurchases = orders.filter((o) => o.buyerPhone === currentUserPhone);
+    const mySales = orders.filter((o) => o.sellerPhone === currentUserPhone || (manageMode && (!o.sellerPhone || o.status === 'disputed')));
+    const list = tab === 'buying' ? myPurchases : mySales;
+    function renderBuyingBody(o) {
+        if (o.status === 'delivered') {
+            const draft = disputeDrafts[o.id] ?? '';
+            return (React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "rounded p-2 mb-2", style: { background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                    React.createElement("p", { style: labelStyle, className: "mb-1" }, "Thông tin sản phẩm"),
+                    React.createElement("p", { className: "text-xs whitespace-pre-wrap", style: { color: COLORS.text } }, o.deliveryInfo || '(trống)')),
+                React.createElement("p", { className: "mb-2", style: { fontSize: '10px', color: COLORS.mutedLight } },
+                    "Tự động chuyển tiền cho người bán sau: ", formatRemaining(o.autoReleaseAt)),
+                React.createElement("button", { onClick: () => onConfirmReceipt(o.id), className: "w-full py-2 rounded-md text-xs font-bold mb-2 transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-1.5", style: { background: COLORS.accent, color: '#06120c' } },
+                    React.createElement(Check, { size: 13 }),
+                    " X\u00C1C_NH\u1EACN_\u0110\u00C3_NH\u1EACN_H\u00C0NG"),
+                disputingId === o.id ? (React.createElement(React.Fragment, null,
+                    React.createElement("textarea", { value: draft, onChange: (e) => setDisputeDrafts((prev) => ({ ...prev, [o.id]: e.target.value })), placeholder: "M\u00F4 t\u1EA3 v\u1EA5n \u0111\u1EC1 g\u1EB7p ph\u1EA3i...", rows: 2, className: "search-input mb-2", style: { ...inputStyle, resize: 'vertical' } }),
+                    React.createElement("button", { onClick: () => { onDispute(o.id, draft); setDisputingId(null); }, disabled: !draft.trim(), className: "w-full py-2 rounded-md text-xs font-bold", style: { background: 'transparent', border: `1px solid ${COLORS.danger}`, color: COLORS.danger, opacity: draft.trim() ? 1 : 0.5 } }, "G\u1EEDI_KHI\u1EBEU_N\u1EA0I"))) : (React.createElement("button", { onClick: () => setDisputingId(o.id), className: "w-full py-1.5 rounded-md text-xs font-bold", style: { background: 'transparent', border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } }, "KHI\u1EBEU_N\u1EA0I"))));
+        }
+        if (o.status === 'disputed') {
+            return (React.createElement(React.Fragment, null,
+                React.createElement("p", { className: "mb-1", style: { fontSize: '11px', color: COLORS.amber } }, "Đang chờ admin xử lý khiếu nại."),
+                React.createElement("p", { style: { fontSize: '10px', color: COLORS.mutedLight } }, "Lý do: ", o.disputeReason)));
+        }
+        if (o.status === 'completed') {
+            return React.createElement("p", { style: { fontSize: '11px', color: COLORS.accent } }, "\u2713 Đã hoàn tất giao dịch.");
+        }
+        return React.createElement("p", { style: { fontSize: '11px', color: COLORS.muted } }, "Khiếu nại được chấp nhận, tiền đã hoàn về ví.");
+    }
+    function renderSellingBody(o) {
+        const payout = Math.round(o.total * (1 - PLATFORM_COMMISSION_RATE));
+        if (o.status === 'delivered') {
+            return (React.createElement("p", { style: { fontSize: '11px', color: COLORS.mutedLight } },
+                "Đã giao tự động \u2014 đang tạm giữ, ",
+                formatRemaining(o.autoReleaseAt),
+                ". Bạn sẽ nhận ",
+                formatVND(payout),
+                " (đã trừ 20% chiết khấu sàn) nếu người mua không khiếu nại."));
+        }
+        if (o.status === 'disputed') {
+            if (manageMode) {
+                return (React.createElement(React.Fragment, null,
+                    React.createElement("p", { className: "mb-2", style: { fontSize: '11px', color: COLORS.amber } }, "Khiếu nại: ", o.disputeReason),
+                    React.createElement("div", { className: "flex gap-2" },
+                        React.createElement("button", { onClick: () => onResolveDispute(o.id, 'release_seller'), className: "flex-1 py-1.5 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: COLORS.accent, color: '#06120c' } }, "THANH_TO\u00C1N_NG\u01AF\u1EDCI_B\u00C1N"),
+                        React.createElement("button", { onClick: () => onResolveDispute(o.id, 'refund_buyer'), className: "flex-1 py-1.5 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { background: 'transparent', border: `1px solid ${COLORS.danger}`, color: COLORS.danger } }, "HO\u00C0N_TI\u1EC0N_NG\u01AF\u1EDCI_MUA"))));
+            }
+            return React.createElement("p", { style: { fontSize: '11px', color: COLORS.amber } }, "Người mua đã khiếu nại, đang chờ admin xử lý.");
+        }
+        if (o.status === 'completed') {
+            return (React.createElement("p", { style: { fontSize: '11px', color: COLORS.accent } },
+                "\u2713 Đã nhận ", formatVND(payout), " (đã trừ 20% chiết khấu sàn)."));
+        }
+        return React.createElement("p", { style: { fontSize: '11px', color: COLORS.muted } }, "Khiếu nại được chấp nhận, tiền đã hoàn cho người mua.");
+    }
+    function renderOrderRow(o) {
+        const statusMeta = DIGITAL_ORDER_STATUS_META[o.status] || { label: o.status, color: COLORS.mutedLight };
+        return (React.createElement("div", { key: o.id, className: "rounded-md p-3", style: { background: COLORS.bg, border: `1px solid ${COLORS.border}` } },
+            React.createElement("div", { className: "flex items-center justify-between gap-2 mb-1" },
+                React.createElement("span", { className: "text-xs font-semibold truncate" }, o.productName, " \u00D7", o.qty),
+                React.createElement("span", { className: "px-1.5 py-0.5 rounded font-bold shrink-0", style: { fontSize: '9px', background: `${statusMeta.color}22`, color: statusMeta.color } }, statusMeta.label)),
+            React.createElement("p", { className: "mb-2", style: { fontSize: '10px', color: COLORS.muted } },
+                "Mã ", o.code, " \u00B7 ", formatDateTime(o.createdAt), " \u00B7 ",
+                React.createElement("span", { className: "font-bold", style: { color: COLORS.accent } }, formatVND(o.total))),
+            tab === 'buying' ? renderBuyingBody(o) : renderSellingBody(o)));
+    }
+    return (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+        React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+            React.createElement("div", { className: "w-full rounded-lg overflow-hidden pointer-events-auto modal-pop flex flex-col", style: { maxWidth: '480px', maxHeight: '85vh', background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                React.createElement(TitleBar, { path: "~/orders/don_hang_so.sh", onClose: onClose, size: 11 }),
+                React.createElement("div", { className: "grid grid-cols-2 gap-2 p-4 pb-3" },
+                    React.createElement("button", { onClick: () => setTab('buying'), className: "py-2 rounded-md text-center font-bold pill-btn", style: { fontSize: '11px', background: tab === 'buying' ? 'rgba(52,211,153,0.12)' : COLORS.bg, border: `1px solid ${tab === 'buying' ? COLORS.accent : COLORS.border}`, color: tab === 'buying' ? COLORS.accent : COLORS.mutedLight } }, "\u0110\u01A0N_MUA"),
+                    React.createElement("button", { onClick: () => setTab('selling'), className: "py-2 rounded-md text-center font-bold pill-btn", style: { fontSize: '11px', background: tab === 'selling' ? 'rgba(251,191,36,0.12)' : COLORS.bg, border: `1px solid ${tab === 'selling' ? COLORS.amber : COLORS.border}`, color: tab === 'selling' ? COLORS.amber : COLORS.mutedLight } }, "\u0110\u01A0N_B\u00C1N")),
+                React.createElement("div", { className: "px-4 pb-4 overflow-y-auto" }, list.length === 0 ? (React.createElement("p", { className: "text-xs text-center py-8", style: { color: COLORS.muted } }, "Chưa có đơn hàng số nào.")) : (React.createElement("div", { className: "flex flex-col gap-3" }, list.map(renderOrderRow))))))));
+}
+/* -------------------------------- main -------------------------------- */
+export default function RootShop() {
+    const [activeCategory, setActiveCategory] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState('featured');
+    const [cart, setCart] = useState({});
+    const [recentlyAdded, setRecentlyAdded] = useState(new Set());
+    const [cartOpen, setCartOpen] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [buyNowProduct, setBuyNowProduct] = useState(null);
+    const [checkoutOpen, setCheckoutOpen] = useState(false);
+    const [checkoutStatus, setCheckoutStatus] = useState('idle');
+    const [orderNumber, setOrderNumber] = useState('');
+    const [manageMode, setManageMode] = useState(false);
+    const [showAddProduct, setShowAddProduct] = useState(false);
+    const [showBankSettings, setShowBankSettings] = useState(false);
+    const [bankSettings, setBankSettings] = useState({ bankCode: VIETNAM_BANKS[0].code, accountNumber: '', accountName: '' });
+    const [orderInfo, setOrderInfo] = useState(null); // { id, code, total, items, status }
+    const [users, setUsers] = useState({}); // { [phone]: { phone, password, name, balance, seller, withdrawBank } }
+    const [usersLoaded, setUsersLoaded] = useState(false);
+    const [transactions, setTransactions] = useState({}); // { [phone]: Transaction[] }
+    const [txLoaded, setTxLoaded] = useState(false);
+    const [digitalOrders, setDigitalOrders] = useState([]); // ShopOrder[] từ backend (/api/shop/orders/mine)
+    const [digitalOrdersLoaded, setDigitalOrdersLoaded] = useState(false);
+    const [showDigitalOrders, setShowDigitalOrders] = useState(false);
+    const [sessionPhone, setSessionPhone] = useState(null);
+    const [authLoaded, setAuthLoaded] = useState(false);
+    const currentUser = useMemo(() => {
+        if (!sessionPhone || !users[sessionPhone])
+            return null;
+        const u = users[sessionPhone];
+        return { phone: u.phone, name: u.name, balance: u.balance || 0, seller: u.seller || null, withdrawBank: u.withdrawBank || null };
+    }, [sessionPhone, users]);
+    const [showLogin, setShowLogin] = useState(false);
+    const [showWallet, setShowWallet] = useState(false);
+    const [walletError, setWalletError] = useState('');
+    const [withdrawError, setWithdrawError] = useState('');
+    const [showSellerRegistration, setShowSellerRegistration] = useState(false);
+    const [sellerRegIntent, setSellerRegIntent] = useState('sell'); // 'sell' | 'withdraw' — decides what happens right after registering
+    const [showTransactionHistory, setShowTransactionHistory] = useState(false);
+    const [showWithdrawalAdmin, setShowWithdrawalAdmin] = useState(false);
+    const [topup, setTopup] = useState(null); // { id, code, amount, status }
+    const [shopProducts, setShopProducts] = useState([]); // toàn bộ sản phẩm (mẫu + do người bán thêm) — nguồn thật từ /api/shop/products
+    const [productsLoaded, setProductsLoaded] = useState(false);
+    const [userVotes, setUserVotes] = useState({});
+    const [comments, setComments] = useState(SEED_COMMENTS);
+    const [productImages, setProductImages] = useState({});
+    const [storageLoaded, setStorageLoaded] = useState(false);
+    const [imagesLoaded, setImagesLoaded] = useState(false);
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await window.storage.get(STORAGE_KEY);
+                if (!cancelled && result && result.value) {
+                    const parsed = JSON.parse(result.value);
+                    setUserVotes(parsed.userVotes || {});
+                    setComments(parsed.comments || SEED_COMMENTS);
+                    if (parsed.bankSettings)
+                        setBankSettings(parsed.bankSettings);
+                }
+            }
+            catch (e) {
+                // chưa có dữ liệu lưu trước đó
+            }
+            finally {
+                if (!cancelled)
+                    setStorageLoaded(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+    useEffect(() => {
+        if (!storageLoaded)
+            return;
+        (async () => {
+            try {
+                await window.storage.set(STORAGE_KEY, JSON.stringify({ userVotes, comments, bankSettings }), false);
+            }
+            catch (e) {
+                console.error('Không thể lưu dữ liệu quản lý', e);
+            }
+        })();
+    }, [userVotes, comments, bankSettings, storageLoaded]);
+    // Danh sách sản phẩm THẬT, dùng chung cho mọi người — thay cho mảng PRODUCTS
+    // cứng + customProducts/productState/deletedIds cục bộ trước đây.
+    async function reloadShopProducts() {
+        try {
+            const res = await fetch(API_URL + '/shop/products');
+            const data = await res.json();
+            if (data && data.success) setShopProducts(data.products);
+        } catch (e) { console.error('tải sản phẩm lỗi', e); }
+    }
+    useEffect(() => {
+        (async () => { await reloadShopProducts(); setProductsLoaded(true); })();
+    }, []);
+    // Đơn hàng thật của tôi (thay cho digitalOrders cục bộ) — cũng tự giải
+    // ngân các đơn hết hạn giữ tiền phía backend mỗi lần gọi.
+    async function reloadMyOrders() {
+        try {
+            const res = await fetch(API_URL + '/shop/orders/mine', { headers: authHeaders() });
+            const data = await res.json();
+            if (data && data.success) setDigitalOrders(data.orders);
+        } catch (e) { console.error('tải đơn hàng lỗi', e); }
+    }
+    useEffect(() => {
+        if (!currentUser) { setDigitalOrdersLoaded(true); return; }
+        (async () => { await reloadMyOrders(); setDigitalOrdersLoaded(true); })();
+    }, [currentUser?.phone]);
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await window.storage.get(IMAGES_STORAGE_KEY);
+                if (!cancelled && result && result.value) {
+                    setProductImages(JSON.parse(result.value));
+                }
+            }
+            catch (e) {
+                // chưa có ảnh nào
+            }
+            finally {
+                if (!cancelled)
+                    setImagesLoaded(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+    useEffect(() => {
+        if (!imagesLoaded)
+            return;
+        (async () => {
+            try {
+                await window.storage.set(IMAGES_STORAGE_KEY, JSON.stringify(productImages), false);
+            }
+            catch (e) {
+                console.error('Không thể lưu hình ảnh (có thể đã vượt giới hạn dung lượng)', e);
+            }
+        })();
+    }, [productImages, imagesLoaded]);
+    // Nạp danh sách tài khoản đã lưu (mô phỏng backend cục bộ trong trình duyệt)
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await window.storage.get(USERS_STORAGE_KEY);
+                if (!cancelled && result && result.value)
+                    setUsers(JSON.parse(result.value));
+            }
+            catch (e) {
+                // chưa có tài khoản nào
+            }
+            finally {
+                if (!cancelled)
+                    setUsersLoaded(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+    useEffect(() => {
+        if (!usersLoaded)
+            return;
+        (async () => {
+            try {
+                await window.storage.set(USERS_STORAGE_KEY, JSON.stringify(users), false);
+            }
+            catch (e) {
+                console.error('Không thể lưu tài khoản người dùng', e);
+            }
+        })();
+    }, [users, usersLoaded]);
+    // Nạp lịch sử giao dịch đã lưu
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await window.storage.get(TX_STORAGE_KEY);
+                if (!cancelled && result && result.value)
+                    setTransactions(JSON.parse(result.value));
+            }
+            catch (e) {
+                // chưa có giao dịch nào
+            }
+            finally {
+                if (!cancelled)
+                    setTxLoaded(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+    useEffect(() => {
+        if (!txLoaded)
+            return;
+        (async () => {
+            try {
+                await window.storage.set(TX_STORAGE_KEY, JSON.stringify(transactions), false);
+            }
+            catch (e) {
+                console.error('Không thể lưu lịch sử giao dịch', e);
+            }
+        })();
+    }, [transactions, txLoaded]);
+    // Đăng nhập dùng chung với cả site: đọc token thật, lấy hồ sơ thật qua
+    // /api/auth/me. Không còn đăng ký số điện thoại/mật khẩu riêng cho Shop.
+    // Vẫn dùng lại cấu trúc users[key] có sẵn (seller, withdrawBank...) cho
+    // phần mô phỏng người bán — chỉ đổi "key" từ số điện thoại tự đăng ký
+    // sang username thật, và đồng bộ "balance" từ ví thật mỗi lần tải lại.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const token = localStorage.getItem('ss_token');
+                if (!token) return;
+                const res = await fetch(API_URL + '/auth/me', { headers: authHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (cancelled || !data || !data.success || !data.user) return;
+                const me = data.user;
+                const key = me.username;
+                setUsers((prev) => {
+                    const cur = prev[key];
+                    return {
+                        ...prev,
+                        [key]: {
+                            phone: key,
+                            name: me.displayName || me.username,
+                            balance: me.walletBalance || 0,
+                            seller: cur?.seller || null,
+                            withdrawBank: cur?.withdrawBank || null,
+                        },
+                    };
+                });
+                setSessionPhone(key);
+            }
+            catch (e) {
+                // chưa đăng nhập hoặc lỗi mạng — coi như khách
+            }
+            finally {
+                if (!cancelled)
+                    setAuthLoaded(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+    function updateUserRecord(phone, updater) {
+        setUsers((prev) => {
+            const cur = prev[phone];
+            if (!cur)
+                return prev;
+            const next = typeof updater === 'function' ? updater(cur) : { ...cur, ...updater };
+            return { ...prev, [phone]: next };
+        });
+    }
+    function addTransaction(phone, tx) {
+        const record = { id: genId('tx'), time: new Date().toISOString(), ...tx };
+        setTransactions((prev) => ({ ...prev, [phone]: [record, ...(prev[phone] || [])] }));
+        return record;
+    }
+    function creditBalance(phone, amount, tx) {
+        updateUserRecord(phone, (u) => ({ ...u, balance: (u.balance || 0) + amount }));
+        addTransaction(phone, { amount, direction: 'in', status: 'completed', ...tx });
+    }
+    function debitBalance(phone, amount, tx) {
+        updateUserRecord(phone, (u) => ({ ...u, balance: Math.max(0, (u.balance || 0) - amount) }));
+        addTransaction(phone, { amount, direction: 'out', status: 'completed', ...tx });
+    }
+    // Trả tiền cho người bán sau khi trừ 20% chiết khấu sàn (giống Shopee/TikTok Shop).
+    function creditSellerForSale(phone, grossAmount, description, meta) {
+        const payout = Math.round(grossAmount * (1 - PLATFORM_COMMISSION_RATE));
+        const fee = grossAmount - payout;
+        creditBalance(phone, payout, {
+            type: 'sale',
+            description: `${description} \u2014 giá ${formatVND(grossAmount)}, chiết khấu sàn 20%: -${formatVND(fee)}, thực nhận ${formatVND(payout)}`,
+            meta,
+        });
+        return payout;
+    }
+    // Cộng tiền bán hàng vào ví của người bán đã đăng sản phẩm (sellerPhone). Sản phẩm gốc của
+    // shop (không có sellerPhone) thì không thuộc về người bán nào nên bỏ qua bước này.
+    function creditSellersForItems(items, orderCode) {
+        const bySeller = {};
+        items.forEach((i) => {
+            if (i.sellerPhone)
+                bySeller[i.sellerPhone] = (bySeller[i.sellerPhone] || 0) + i.price * i.qty;
+        });
+        Object.entries(bySeller).forEach(([phone, amount]) => {
+            if (users[phone]) {
+                creditSellerForSale(phone, amount, `Bán hàng \u2014 đơn ${orderCode}`, { orderCode });
+            }
+        });
+    }
+    // Đăng nhập/đăng ký giờ dùng chung trang login.html của site — không còn
+    // form riêng ở đây nữa (xem goToLogin() và useEffect nạp phiên ở trên).
+    async function handleLogout() {
+        setSessionPhone(null);
+        setShowWallet(false);
+        localStorage.removeItem('ss_token');
+        window.location.href = 'login.html';
+    }
+    const topupPollRef = useRef(null);
+    function stopTopupPolling() {
+        if (topupPollRef.current) { clearInterval(topupPollRef.current); topupPollRef.current = null; }
+    }
+    async function refreshRealBalance(key) {
+        try {
+            const res = await fetch(API_URL + '/shop/wallet/me', { headers: authHeaders() });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data && data.success) updateUserRecord(key, (u) => ({ ...u, balance: data.balance }));
+        } catch (e) { /* bỏ qua, thử lại ở lần poll sau */ }
+    }
+    function pollTopupStatus(id, key) {
+        stopTopupPolling();
+        topupPollRef.current = setInterval(async () => {
+            try {
+                const res = await fetch(API_URL + '/shop/wallet/topup/' + id, { headers: authHeaders() });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!data || !data.success) return;
+                if (data.status === 'paid') {
+                    stopTopupPolling();
+                    await refreshRealBalance(key);
+                    setTopup((t) => (t && t.id === id ? { ...t, status: 'paid' } : t));
+                }
+            } catch (e) { /* mạng lỗi tạm thời — vòng poll sau thử lại */ }
+        }, 3500);
+    }
+    async function startTopup(amount) {
+        if (!currentUser)
+            return;
+        if (!amount || amount < MIN_TOPUP) {
+            setWalletError(`Số tiền nạp tối thiểu là ${formatVND(MIN_TOPUP)}`);
+            return;
+        }
+        setWalletError('');
+        try {
+            const res = await fetch(API_URL + '/shop/wallet/topup', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ amount }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) { setWalletError(data.message || 'Không tạo được yêu cầu nạp tiền'); return; }
+            setTopup({ id: data.id, code: data.code, amount: data.amount, qrUrl: data.qrUrl, status: 'pending' });
+            pollTopupStatus(data.id, currentUser.phone);
+        } catch (e) {
+            setWalletError('Không kết nối được máy chủ, thử lại sau');
+        }
+    }
+    function confirmTopup() {
+        // Không còn tự xác nhận giả nữa — bấm nút này chỉ để kiểm tra ngay lập
+        // tức thay vì đợi vòng poll 3.5s kế tiếp. Ví chỉ thật sự được cộng khi
+        // webhook SePay xác nhận có tiền vào (routes/sepayWebhook.js).
+        if (!topup || !currentUser)
+            return;
+        pollTopupStatus(topup.id, currentUser.phone);
+    }
+    function cancelTopup() {
+        stopTopupPolling();
+        setTopup(null);
+        setWalletError('');
+    }
+    function handleWithdraw({ amount, bankCode, accountNumber, accountName }) {
+        if (!currentUser)
+            return;
+        updateUserRecord(currentUser.phone, (u) => ({ ...u, balance: Math.max(0, (u.balance || 0) - amount), withdrawBank: { bankCode, accountNumber, accountName } }));
+        const bankName = (VIETNAM_BANKS.find((b) => b.code === bankCode) || {}).name || 'ngân hàng';
+        addTransaction(currentUser.phone, {
+            type: 'withdraw',
+            amount,
+            direction: 'out',
+            status: 'pending',
+            description: `Yêu cầu rút tiền về ${bankName}`,
+            meta: { bankCode, accountNumber, accountName },
+        });
+        setWithdrawError('');
+    }
+    function resolveWithdrawal(phone, txId, outcome) {
+        const list = transactions[phone] || [];
+        const target = list.find((t) => t.id === txId);
+        if (target && outcome === 'reject') {
+            updateUserRecord(phone, (u) => ({ ...u, balance: (u.balance || 0) + target.amount }));
+        }
+        setTransactions((prev) => ({
+            ...prev,
+            [phone]: (prev[phone] || []).map((t) => (t.id === txId ? { ...t, status: outcome === 'approve' ? 'completed' : 'rejected' } : t)),
+        }));
+    }
+    function submitSellerRegistration({ idCardNumber, phone }) {
+        if (!currentUser)
+            return;
+        updateUserRecord(currentUser.phone, (u) => ({ ...u, seller: { idCardNumber, phone, registeredAt: new Date().toISOString() } }));
+        setShowSellerRegistration(false);
+        if (sellerRegIntent === 'sell')
+            setShowAddProduct(true);
+    }
+    function handleOpenAddProduct() {
+        if (!currentUser) {
+            goToLogin();
+            return;
+        }
+        if (!currentUser.seller) {
+            setSellerRegIntent('sell');
+            setShowSellerRegistration(true);
+            return;
+        }
+        setShowAddProduct(true);
+    }
+    // Sản phẩm số (VPS, tài khoản thuê...) đi qua cơ chế giữ tiền: tiền được tạm giữ (chưa
+    // cộng cho người bán) cho tới khi người mua xác nhận đã nhận được thông tin bàn giao.
+    // Lấy `qty` dòng đầu tiên còn trống trong kho của sản phẩm số, trả về null nếu không đủ hàng.
+    // Đồng bộ luôn productState.stock theo số dòng còn lại để UI hiển thị đúng (giống hàng thường).
+    // claimDigitalStock không còn cần nữa — việc giao hàng số giờ chạy atomic
+    // trong 1 transaction ở backend (routes/shopOrders.js /buy-now), tránh 2
+    // người mua cùng lúc nhận trùng 1 tài khoản.
+    async function restockDigital(productId, lines) {
+        try {
+            await fetch(API_URL + '/shop/products/' + productId + '/restock', {
+                method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ lines }),
+            });
+            await reloadShopProducts();
+        } catch (e) { console.error('nhập kho lỗi', e); }
+    }
+    // Toàn bộ vòng đời đơn hàng số (giao -> xác nhận/khiếu nại/tự giải ngân)
+    // giờ chạy thật ở backend (routes/shopOrders.js). Giải ngân tự động sau
+    // DIGITAL_HOLD_HOURS giờ cũng chuyển xuống server (chạy "lười" mỗi khi
+    // /mine được gọi) — không cần setInterval phía client nữa.
+    async function confirmDigitalOrderReceipt(orderId) {
+        try {
+            await fetch(API_URL + '/shop/orders/' + orderId + '/confirm', { method: 'POST', headers: authHeaders() });
+            await reloadMyOrders();
+        } catch (e) { console.error('xác nhận đơn lỗi', e); }
+    }
+    async function disputeDigitalOrder(orderId, reason) {
+        try {
+            await fetch(API_URL + '/shop/orders/' + orderId + '/dispute', {
+                method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ reason }),
+            });
+            await reloadMyOrders();
+        } catch (e) { console.error('khiếu nại đơn lỗi', e); }
+    }
+    async function resolveDigitalDispute(orderId, outcome) {
+        try {
+            await fetch(API_URL + '/shop/orders/' + orderId + '/resolve', {
+                method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ outcome }),
+            });
+            await reloadMyOrders();
+        } catch (e) { console.error('xử lý khiếu nại lỗi', e); }
+    }
+    async function purchaseWithBalance(product, qty) {
+        if (!currentUser)
+            return { ok: false, reason: 'no_auth' };
+        try {
+            const res = await fetch(API_URL + '/shop/orders/buy-now', {
+                method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ productId: product.id, qty }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                const reason = data.message === 'Số dư ví không đủ' ? 'insufficient' : (data.message === 'Hết hàng' ? 'out_of_stock' : 'insufficient');
+                return { ok: false, reason };
+            }
+            await refreshRealBalance(currentUser.phone);
+            await reloadShopProducts();
+            if (product.category === 'digital')
+                await reloadMyOrders();
+            return { ok: true, orderNumber: data.order.code, digital: data.order.isDigital, deliveryInfo: data.order.deliveryInfo };
+        } catch (e) {
+            return { ok: false, reason: 'insufficient' };
+        }
+    }
+    const pendingWithdrawals = useMemo(() => {
+        const list = [];
+        Object.keys(transactions).forEach((phone) => {
+            (transactions[phone] || []).forEach((tx) => {
+                if (tx.type === 'withdraw' && tx.status === 'pending')
+                    list.push({ ...tx, phone });
+            });
+        });
+        return list.sort((a, b) => new Date(b.time) - new Date(a.time));
+    }, [transactions]);
+    // Đơn hàng số cần tôi xử lý: đơn tôi mua vừa được giao (nên kiểm tra rồi xác nhận hoặc khiếu
+    // nại), hoặc — nếu đang ở chế độ quản lý — đơn đang bị khiếu nại cần admin phân xử.
+    const actionableDigitalOrders = useMemo(() => {
+        // digitalOrders giờ đến từ /api/shop/orders/mine — đã lọc sẵn chỉ đơn
+        // của tôi, nên không cần so buyerPhone nữa. Khiếu nại cần admin xử lý
+        // đang ở phần "còn để cục bộ" mình đã báo — chưa gộp vào đây.
+        return digitalOrders.filter((o) => o.status === 'delivered').length;
+    }, [digitalOrders]);
+    useEffect(() => {
+        document.body.style.overflow = (selectedProduct || cartOpen || buyNowProduct || showAddProduct || checkoutOpen || showBankSettings || showLogin || showWallet || showSellerRegistration || showTransactionHistory || showWithdrawalAdmin || showDigitalOrders) ? 'hidden' : '';
+        return () => { document.body.style.overflow = ''; };
+    }, [selectedProduct, cartOpen, buyNowProduct, showAddProduct, checkoutOpen, showBankSettings, showLogin, showWallet, showSellerRegistration, showTransactionHistory, showWithdrawalAdmin, showDigitalOrders]);
+    useEffect(() => {
+        function onKey(e) {
+            if (e.key === 'Escape') {
+                setSelectedProduct(null);
+                setCartOpen(false);
+                setBuyNowProduct(null);
+                setShowAddProduct(false);
+                setCheckoutOpen(false);
+                setShowBankSettings(false);
+                setShowLogin(false);
+                setShowWallet(false);
+                setShowSellerRegistration(false);
+                setShowTransactionHistory(false);
+                setShowWithdrawalAdmin(false);
+                setShowDigitalOrders(false);
+            }
+        }
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+    const visibleProducts = useMemo(() => {
+        return shopProducts.map((p) => ({
+            ...p,
+            icon: ICONS[p.iconKey] || Package,
+            images: productImages[p.id] || p.images || [],
+        }));
+    }, [shopProducts, productImages]);
+    const categoryCounts = useMemo(() => {
+        const counts = { all: visibleProducts.length };
+        CATEGORIES.forEach((c) => { if (c.id !== 'all')
+            counts[c.id] = visibleProducts.filter((p) => p.category === c.id).length; });
+        return counts;
+    }, [visibleProducts]);
+    const groupedByCategory = useMemo(() => {
+        const map = {};
+        CATEGORIES.filter((c) => c.id !== 'all').forEach((c) => { map[c.id] = visibleProducts.filter((p) => p.category === c.id); });
+        return map;
+    }, [visibleProducts]);
+    const filteredProducts = useMemo(() => {
+        let list = visibleProducts;
+        if (activeCategory !== 'all')
+            list = list.filter((p) => p.category === activeCategory);
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            list = list.filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || p.code.toLowerCase().includes(q));
+        }
+        const sorted = [...list];
+        if (sortBy === 'price-asc')
+            sorted.sort((a, b) => a.price - b.price);
+        else if (sortBy === 'price-desc')
+            sorted.sort((a, b) => b.price - a.price);
+        else if (sortBy === 'rating')
+            sorted.sort((a, b) => b.rating - a.rating);
+        return sorted;
+    }, [visibleProducts, activeCategory, searchQuery, sortBy]);
+    const showGrouped = activeCategory === 'all' && !searchQuery.trim() && sortBy === 'featured';
+    async function updateStatus(id, statusValue) {
+        try {
+            await fetch(API_URL + '/shop/products/' + id, {
+                method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ status: statusValue }),
+            });
+            await reloadShopProducts();
+        } catch (e) { console.error('cập nhật trạng thái lỗi', e); }
+    }
+    async function setStock(id, value) {
+        try {
+            await fetch(API_URL + '/shop/products/' + id, {
+                method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ stock: Math.max(0, value) }),
+            });
+            await reloadShopProducts();
+        } catch (e) { console.error('cập nhật tồn kho lỗi', e); }
+    }
+    async function deleteProduct(id) {
+        setCart((prev) => { const next = { ...prev }; delete next[id]; return next; });
+        try {
+            await fetch(API_URL + '/shop/products/' + id, {
+                method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ deleted: true }),
+            });
+            await reloadShopProducts();
+        } catch (e) { console.error('xoá sản phẩm lỗi', e); }
+    }
+    // Dùng cho đơn COD/chuyển khoản thủ công (handleCheckout) — 2 luồng này CHƯA
+    // tạo ShopOrder thật (chỉ mua bằng ví mới tạo), nhưng vẫn cần trừ đúng kho
+    // THẬT để không bán vượt tồn kho giữa 2 luồng mua khác nhau.
+    async function decrementStock(items) {
+        try {
+            await Promise.all(items.map(({ id, qty }) => {
+                const p = shopProducts.find((sp) => sp.id === id);
+                const newStock = Math.max(0, (p?.stock || 0) - qty);
+                return fetch(API_URL + '/shop/products/' + id, {
+                    method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                    body: JSON.stringify({ stock: newStock, status: newStock === 0 ? 'out-of-stock' : undefined }),
+                });
+            }));
+            await reloadShopProducts();
+        } catch (e) { console.error('trừ kho lỗi', e); }
+    }
+    function handleVote(id, type) {
+        const current = userVotes[id];
+        setUserVotes((prev) => ({ ...prev, [id]: current === type ? null : type }));
+        // Lưu ý: số lượt thích/không thích hiển thị vẫn lấy từ backend (tĩnh) —
+        // chưa làm route cập nhật lượt vote thật, xem phần "còn để cục bộ" mình
+        // đã báo. Bấm vẫn đổi trạng thái nút cho người dùng hiện tại, chỉ là
+        // con số tổng chưa tự tăng/giảm theo thời gian thực nữa.
+    }
+    function addComment(id, text) {
+        setComments((prev) => ({
+            ...prev,
+            [id]: [{ id: 'c' + Date.now(), author: 'Khách', text: text.trim(), time: 'Vừa xong' }, ...(prev[id] || [])],
+        }));
+    }
+    function addImages(id, newImages) {
+        setProductImages((prev) => ({ ...prev, [id]: [...(prev[id] || []), ...newImages].slice(0, MAX_IMAGES) }));
+    }
+    function removeImage(id, index) {
+        setProductImages((prev) => ({ ...prev, [id]: (prev[id] || []).filter((_, i) => i !== index) }));
+    }
+    async function addCustomProduct(data) {
+        try {
+            const res = await fetch(API_URL + '/shop/products', {
+                method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({
+                    name: data.name, category: data.category, price: data.price,
+                    desc: data.desc || 'Sản phẩm mới đăng bán.',
+                    specs: data.specs.length ? data.specs : ['Chưa có thông số chi tiết'],
+                    stock: data.stock, iconKey: 'Package',
+                }),
+            });
+            const result = await res.json();
+            if (result && result.success && data.category === 'digital' && Array.isArray(data.stockPool) && data.stockPool.length) {
+                await fetch(API_URL + '/shop/products/' + result.product.id + '/restock', {
+                    method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                    body: JSON.stringify({ lines: data.stockPool }),
+                });
+            }
+            await reloadShopProducts();
+        } catch (e) { console.error('thêm sản phẩm lỗi', e); }
+        setShowAddProduct(false);
+    }
+    function saveBankSettings(settings) {
+        setBankSettings(settings);
+        setShowBankSettings(false);
+    }
+    function addToCart(id) {
+        setCart((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+        setRecentlyAdded((prev) => new Set(prev).add(id));
+        setTimeout(() => {
+            setRecentlyAdded((prev) => { const next = new Set(prev); next.delete(id); return next; });
+        }, 1200);
+    }
+    function setCartQty(id, value) {
+        setCart((prev) => {
+            const next = { ...prev };
+            const product = visibleProducts.find((p) => p.id === id);
+            const maxStock = product ? product.stock : Infinity;
+            const clamped = Math.min(maxStock, Math.max(0, value));
+            if (clamped <= 0)
+                delete next[id];
+            else
+                next[id] = clamped;
+            return next;
+        });
+    }
+    function removeItem(id) {
+        setCart((prev) => { const next = { ...prev }; delete next[id]; return next; });
+    }
+    function openBuyNow(product) {
+        setSelectedProduct(null);
+        if (!currentUser) {
+            goToLogin();
+            return;
+        }
+        setBuyNowProduct(product);
+    }
+    const cartItems = useMemo(() => Object.entries(cart).map(([id, qty]) => ({ ...visibleProducts.find((p) => p.id === id), qty })).filter((item) => item.id), [cart, visibleProducts]);
+    const cartCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
+    const cartTotal = useMemo(() => cartItems.reduce((sum, item) => sum + item.price * item.qty, 0), [cartItems]);
+    function handleCheckout(form) {
+        setCheckoutStatus('creating');
+        const orderItems = cartItems.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, sellerPhone: i.sellerPhone || null }));
+        const code = genCode('DH');
+        const id = genId('ord');
+        setTimeout(() => {
+            if (form.payment === 'cod') {
+                setOrderInfo({ id, code, total: cartTotal, items: orderItems, status: 'confirmed' });
+                decrementStock(orderItems.map((i) => ({ id: i.id, qty: i.qty })));
+                creditSellersForItems(orderItems, code);
+                setOrderNumber(code);
+                setCheckoutStatus('success');
+            }
+            else {
+                setOrderInfo({ id, code, total: cartTotal, items: orderItems, status: 'pending' });
+                setCheckoutStatus('awaiting_payment');
+            }
+        }, 500);
+    }
+    function confirmOrderPayment() {
+        if (!orderInfo)
+            return;
+        decrementStock(orderInfo.items.map((i) => ({ id: i.id, qty: i.qty })));
+        creditSellersForItems(orderInfo.items, orderInfo.code);
+        setOrderInfo((o) => (o ? { ...o, status: 'paid' } : o));
+        setOrderNumber(orderInfo.code);
+        setCheckoutStatus('success');
+    }
+    function cancelPendingOrder() {
+        setOrderInfo(null);
+        setCheckoutStatus('idle');
+    }
+    function closeCheckout() {
+        if (checkoutStatus === 'success') {
+            setCart({});
+            setCheckoutStatus('idle');
+            setOrderInfo(null);
+        }
+        setCheckoutOpen(false);
+    }
+    return (React.createElement("div", { className: "rootshop min-h-screen relative", style: { background: COLORS.bg, color: COLORS.text, fontFamily: FONT_STACK } },
+        React.createElement("style", null, CUSTOM_CSS),
+        React.createElement("div", { className: "pointer-events-none fixed inset-0 z-0", style: { backgroundImage: `linear-gradient(rgba(52,211,153,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.035) 1px, transparent 1px)`, backgroundSize: '42px 42px' } }),
+        React.createElement("div", { className: "relative z-10" },
+            React.createElement("header", { className: "sticky top-0 z-30", style: { background: 'rgba(10,13,12,0.9)', backdropFilter: 'blur(8px)', borderBottom: `1px solid ${COLORS.border}` } },
+                React.createElement("div", { className: "max-w-7xl mx-auto" },
+                    React.createElement("div", { className: "hidden sm:flex items-center gap-4 px-6 py-1.5", style: { fontSize: '10px', color: COLORS.muted, borderBottom: `1px solid ${COLORS.border}` } },
+                        React.createElement("span", { className: "flex items-center gap-1.5" },
+                            React.createElement("span", { className: "w-1.5 h-1.5 rounded-full", style: { background: COLORS.accent } }),
+                            " K\u1EBET_N\u1ED0I_AN_TO\u00C0N"),
+                        React.createElement("span", null, "\u2022"),
+                        React.createElement("span", null,
+                            visibleProducts.length,
+                            " S\u1EA2N_PH\u1EA8M"),
+                        React.createElement("span", null, "\u2022"),
+                        React.createElement("span", null, "UPTIME 99.98%"),
+                        React.createElement("span", { className: "ml-auto" }, "phi\u00EAn: 0x7f3a9c")),
+                    React.createElement("div", { className: "flex items-center gap-3 px-4 sm:px-6 py-3" },
+                        React.createElement("div", { className: "flex items-center gap-2 font-bold text-base sm:text-lg shrink-0" },
+                            React.createElement(Terminal, { size: 22, style: { color: COLORS.accent } }),
+                            React.createElement("span", null,
+                                "ROOT",
+                                React.createElement("span", { style: { color: COLORS.accent } }, "://"),
+                                "SHOP"),
+                            React.createElement("span", { className: "blink-cursor hidden sm:inline", style: { color: COLORS.accent } }, "_")),
+                        React.createElement("div", { className: "flex-1 relative min-w-0" },
+                            React.createElement(Search, { size: 15, className: "absolute left-3 top-1/2 -translate-y-1/2", style: { color: COLORS.muted } }),
+                            React.createElement("input", { value: searchQuery, onChange: (e) => setSearchQuery(e.target.value), placeholder: "grep -i 't\u00ECm ki\u1EBFm...'", "aria-label": "T\u00ECm ki\u1EBFm s\u1EA3n ph\u1EA9m", className: "search-input w-full pl-9 pr-8 py-2 rounded-md text-sm transition-all duration-200", style: { background: COLORS.surface, color: COLORS.text } }),
+                            searchQuery && (React.createElement("button", { onClick: () => setSearchQuery(''), "aria-label": "X\u00F3a t\u00ECm ki\u1EBFm", className: "absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded", style: { color: COLORS.muted } },
+                                React.createElement(X, { size: 13 })))),
+                        React.createElement("button", { onClick: () => (currentUser ? setShowWallet(true) : goToLogin()), "aria-label": "V\u00ED ti\u1EC1n", className: "flex items-center gap-1.5 px-2.5 py-2 rounded-md transition-all duration-200 hover:scale-105 active:scale-95 shrink-0 font-semibold", style: { fontSize: '11px', background: COLORS.surface, border: `1px solid ${COLORS.border}`, color: currentUser ? COLORS.accent : COLORS.mutedLight } },
+                            React.createElement(Landmark, { size: 16 }),
+                            currentUser ? formatVND(currentUser.balance || 0) : 'ĐĂNG_NHẬP'),
+                        React.createElement("button", { onClick: () => setManageMode((m) => !m), "aria-label": "Ch\u1EBF \u0111\u1ED9 qu\u1EA3n l\u00FD", className: "relative p-2.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95 shrink-0", style: manageMode ? { background: COLORS.amber, color: '#1a1200' } : { background: COLORS.surface, border: `1px solid ${COLORS.border}`, color: COLORS.mutedLight } },
+                            React.createElement(Settings, { size: 18 })),
+                        React.createElement("button", { onClick: () => setCartOpen(true), "aria-label": "M\u1EDF gi\u1ECF h\u00E0ng", className: "relative p-2.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95 shrink-0", style: { background: COLORS.surface, border: `1px solid ${COLORS.border}` } },
+                            React.createElement(ShoppingCart, { size: 18 }),
+                            cartCount > 0 && (React.createElement("span", { className: "absolute -top-1.5 -right-1.5 flex items-center justify-center w-5 h-5 rounded-full font-bold", style: { fontSize: '10px', background: COLORS.amber, color: '#100b02' } }, cartCount)))),
+                    manageMode && (React.createElement("div", { className: "px-4 sm:px-6 py-2 flex items-center justify-between flex-wrap gap-2", style: { fontSize: '11px', color: COLORS.amber, background: 'rgba(251,191,36,0.08)', borderTop: `1px solid ${COLORS.border}` } },
+                        React.createElement("span", null, "\u2699 Ch\u1EBF \u0111\u1ED9 qu\u1EA3n l\u00FD \u2014 b\u1EA5m v\u00E0o s\u1EA3n ph\u1EA9m \u0111\u1EC3 \u0111\u1ED5i tr\u1EA1ng th\u00E1i, s\u1ED1 l\u01B0\u1EE3ng, \u1EA3nh ho\u1EB7c xo\u00E1"),
+                        React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+                            React.createElement("button", { onClick: () => setShowBankSettings(true), className: "flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { fontSize: '11px', background: 'transparent', border: `1px solid ${COLORS.amber}`, color: COLORS.amber } },
+                                React.createElement(Landmark, { size: 13 }),
+                                " NG\u00C2N_H\u00C0NG"),
+                            React.createElement("button", { onClick: () => setShowWithdrawalAdmin(true), className: "relative flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { fontSize: '11px', background: 'transparent', border: `1px solid ${COLORS.amber}`, color: COLORS.amber } },
+                                React.createElement(ArrowUpFromLine, { size: 13 }),
+                                " DUY\u1EC6T_R\u00DAT_TI\u1EC0N",
+                                pendingWithdrawals.length > 0 && (React.createElement("span", { className: "absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full font-bold", style: { fontSize: '9px', background: COLORS.danger, color: '#1a0505' } }, pendingWithdrawals.length))),
+                            React.createElement("button", { onClick: handleOpenAddProduct, className: "flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold transition-all duration-200 hover:brightness-110 active:scale-95", style: { fontSize: '11px', background: COLORS.amber, color: '#1a1200' } },
+                                React.createElement(Plus, { size: 13 }),
+                                " \u0110\u0102NG_B\u00C1N")))),
+                    React.createElement("div", { className: "flex items-center gap-2 px-4 sm:px-6 pb-3 overflow-x-auto no-scrollbar" }, CATEGORIES.map((cat) => {
+                        const active = activeCategory === cat.id;
+                        const Icon = cat.icon;
+                        return (React.createElement("button", { key: cat.id, onClick: () => setActiveCategory(cat.id), className: "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all duration-200 shrink-0 pill-btn", style: active ? { background: COLORS.accent, color: '#06120c' } : { background: COLORS.surface, color: COLORS.mutedLight, border: `1px solid ${COLORS.border}` } },
+                            React.createElement(Icon, { size: 13 }),
+                            cat.name,
+                            React.createElement("span", { style: { opacity: 0.7 } },
+                                "[",
+                                categoryCounts[cat.id] || 0,
+                                "]")));
+                    })))),
+            React.createElement("section", { className: "px-4 sm:px-6 py-8 sm:py-12 relative overflow-hidden" },
+                React.createElement("div", { className: "pointer-events-none absolute -top-20 left-1/4 w-96 h-96 rounded-full", style: { background: COLORS.accent, opacity: 0.06, filter: 'blur(100px)' } }),
+                React.createElement("div", { className: "max-w-7xl mx-auto relative" },
+                    React.createElement("p", { className: "text-xs sm:text-sm mb-2", style: { color: COLORS.accent } }, "$ initiate_browse --category=all --status=ready"),
+                    React.createElement("h1", { className: "text-2xl sm:text-4xl font-bold mb-3 leading-tight" },
+                        "H\u00E0ng \u0111\u1EA7y kho. ",
+                        React.createElement("span", { style: { color: COLORS.accent } }, "Kh\u00F4ng r\u01B0\u1EDDm r\u00E0.")),
+                    React.createElement("p", { className: "text-sm sm:text-base mb-1", style: { color: COLORS.mutedLight } },
+                        visibleProducts.length,
+                        " s\u1EA3n ph\u1EA9m m\u1EABu tr\u00EAn ",
+                        CATEGORIES.length - 1,
+                        " danh m\u1EE5c \u2014 b\u1EA5m \u2699 \u0111\u1EC3 \u0111\u0103ng th\u00EAm."),
+                    React.createElement("p", { className: "typewriter text-sm sm:text-base font-semibold", style: { color: COLORS.accent } }, "H\u1EC7 th\u1ED1ng ho\u1EA1t \u0111\u1ED9ng \u1ED5n \u0111\u1ECBnh."))),
+            React.createElement(WalletSection, { user: currentUser, bankSettings: bankSettings, topup: topup, busy: false, error: walletError, withdrawError: withdrawError, onStartTopup: startTopup, onCancelTopup: cancelTopup, onConfirmTopup: confirmTopup, onWithdraw: handleWithdraw, onOpenHistory: () => setShowTransactionHistory(true), onOpenDigitalOrders: () => setShowDigitalOrders(true), digitalOrdersBadge: actionableDigitalOrders, onNeedSellerRegistration: () => { setSellerRegIntent('withdraw'); setShowSellerRegistration(true); }, onLogin: goToLogin }),
+            React.createElement("main", { className: "px-4 sm:px-6 pb-16" },
+                React.createElement("div", { className: "max-w-7xl mx-auto" },
+                    React.createElement("div", { className: "flex items-center justify-between flex-wrap gap-3 mb-5" },
+                        React.createElement("p", { className: "text-xs sm:text-sm", style: { color: COLORS.muted } }, searchQuery ? (React.createElement(React.Fragment, null,
+                            "root@shop:~$ grep -i \"",
+                            searchQuery,
+                            "\" ./",
+                            activeCategory === 'all' ? 'all_items' : activeCategory,
+                            " ",
+                            React.createElement("span", { style: { color: COLORS.accent } },
+                                "\u2192 ",
+                                filteredProducts.length,
+                                " k\u1EBFt qu\u1EA3"))) : (React.createElement(React.Fragment, null,
+                            "root@shop:~$ ls ./",
+                            activeCategory === 'all' ? 'all_items' : activeCategory,
+                            " ",
+                            React.createElement("span", { style: { color: COLORS.accent } },
+                                "\u2192 ",
+                                filteredProducts.length,
+                                " k\u1EBFt qu\u1EA3")))),
+                        React.createElement(SortDropdown, { value: sortBy, onChange: setSortBy })),
+                    filteredProducts.length === 0 ? (React.createElement(EmptyState, { query: searchQuery, onClear: () => { setSearchQuery(''); setActiveCategory('all'); setSortBy('featured'); } })) : showGrouped ? (CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (React.createElement(CategorySection, { key: cat.id, category: cat, products: groupedByCategory[cat.id] || [], onOpen: setSelectedProduct, onAdd: addToCart, onBuyNow: openBuyNow, recentlyAdded: recentlyAdded, manageMode: manageMode, onUpdateStatus: updateStatus, onSetStock: setStock, onDelete: deleteProduct, onRestockDigital: restockDigital })))) : (React.createElement(ProductGrid, { products: filteredProducts, onOpen: setSelectedProduct, onAdd: addToCart, onBuyNow: openBuyNow, recentlyAdded: recentlyAdded, manageMode: manageMode, onUpdateStatus: updateStatus, onSetStock: setStock, onDelete: deleteProduct, onRestockDigital: restockDigital })))),
+            React.createElement("footer", { className: "px-4 sm:px-6 py-8", style: { borderTop: `1px solid ${COLORS.border}` } },
+                React.createElement("div", { className: "flex flex-col sm:flex-row items-center justify-between gap-4 max-w-7xl mx-auto" },
+                    React.createElement("div", { className: "flex items-center gap-2 text-sm font-bold" },
+                        React.createElement(Terminal, { size: 16, style: { color: COLORS.accent } }),
+                        "ROOT",
+                        React.createElement("span", { style: { color: COLORS.accent } }, "://"),
+                        "SHOP"),
+                    React.createElement("div", { className: "flex items-center gap-4", style: { fontSize: '12px', color: COLORS.muted } },
+                        React.createElement("span", null, "[gi\u1EDBi thi\u1EC7u]"),
+                        React.createElement("span", null, "[h\u1ED7 tr\u1EE3]"),
+                        React.createElement("span", null, "[\u0111i\u1EC1u kho\u1EA3n]"),
+                        React.createElement("span", null, "[b\u1EA3o m\u1EADt]")),
+                    React.createElement("p", { style: { fontSize: '11px', color: COLORS.muted } }, "\u00A9 2026 \u2014 h\u1EC7 th\u1ED1ng ho\u1EA1t \u0111\u1ED9ng b\u00ECnh th\u01B0\u1EDDng")))),
+        React.createElement(CartDrawer, { open: cartOpen, onClose: () => setCartOpen(false), items: cartItems, onSetQty: setCartQty, onRemove: removeItem, total: cartTotal, onOpenCheckout: () => { setCartOpen(false); setCheckoutOpen(true); } }),
+        checkoutOpen && (React.createElement(CheckoutModal, { items: cartItems, total: cartTotal, status: checkoutStatus, orderNumber: orderNumber, orderInfo: orderInfo, bankSettings: bankSettings, onConfirm: handleCheckout, onCancelOrder: cancelPendingOrder, onConfirmPayment: confirmOrderPayment, onClose: closeCheckout })),
+        showWallet && currentUser && (React.createElement(WalletModal, { user: currentUser, bankSettings: bankSettings, topup: topup, busy: false, error: walletError, withdrawError: withdrawError, onStartTopup: startTopup, onCancelTopup: cancelTopup, onConfirmTopup: confirmTopup, onWithdraw: handleWithdraw, onOpenHistory: () => setShowTransactionHistory(true), onOpenDigitalOrders: () => setShowDigitalOrders(true), digitalOrdersBadge: actionableDigitalOrders, onNeedSellerRegistration: () => { setSellerRegIntent('withdraw'); setShowSellerRegistration(true); }, onClose: () => { setShowWallet(false); setTopup(null); }, onLogout: handleLogout })),
+        showSellerRegistration && currentUser && (React.createElement(SellerRegistrationModal, { user: currentUser, onClose: () => setShowSellerRegistration(false), onSubmit: submitSellerRegistration })),
+        showTransactionHistory && currentUser && (React.createElement(TransactionHistoryModal, { transactions: transactions[currentUser.phone] || [], onClose: () => setShowTransactionHistory(false) })),
+        showWithdrawalAdmin && (React.createElement(WithdrawalAdminModal, { requests: pendingWithdrawals, onApprove: (phone, txId) => resolveWithdrawal(phone, txId, 'approve'), onReject: (phone, txId) => resolveWithdrawal(phone, txId, 'reject'), onClose: () => setShowWithdrawalAdmin(false) })),
+        showDigitalOrders && (React.createElement(DigitalOrdersModal, { currentUserPhone: currentUser?.phone || null, manageMode: manageMode, orders: digitalOrders, onConfirmReceipt: confirmDigitalOrderReceipt, onDispute: disputeDigitalOrder, onResolveDispute: resolveDigitalDispute, onClose: () => setShowDigitalOrders(false) })),
+        buyNowProduct && (React.createElement(QuickBuyModal, { product: buyNowProduct, balance: currentUser?.balance || 0, onClose: () => setBuyNowProduct(null), onConfirmPurchase: purchaseWithBalance, onGoTopup: () => { setBuyNowProduct(null); setShowWallet(true); } })),
+        selectedProduct && (React.createElement(ProductModal, { product: visibleProducts.find((p) => p.id === selectedProduct.id) || selectedProduct, onClose: () => setSelectedProduct(null), onAdd: addToCart, onBuyNow: openBuyNow, justAdded: recentlyAdded.has(selectedProduct.id), manageMode: manageMode, onUpdateStatus: updateStatus, onSetStock: setStock, onDelete: (id) => { deleteProduct(id); setSelectedProduct(null); }, onRestockDigital: restockDigital, onAddImages: addImages, onRemoveImage: removeImage, userVote: userVotes[selectedProduct.id], onVote: handleVote, comments: comments[selectedProduct.id] || [], onAddComment: addComment })),
+        showAddProduct && (React.createElement(AddProductModal, { onClose: () => setShowAddProduct(false), onSubmit: addCustomProduct })),
+        showBankSettings && (React.createElement(BankSettingsModal, { settings: bankSettings, onSave: saveBankSettings, onClose: () => setShowBankSettings(false) }))));
+}
+const __root = createRoot(document.getElementById('root'));
+__root.render(React.createElement(RootShop));
+
+</script>
+</body>
+</html>

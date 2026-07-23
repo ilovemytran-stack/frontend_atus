@@ -20,6 +20,12 @@ GL.initSocket = function () {
     if (GL.remote[userId]) GL.remote[userId].attackFx = 0.2;
   });
   GL.socket.on('game_chat_message', ({ name, text }) => GL.appendChat(name, text));
+  GL.socket.on('game_world_chat_message', ({ userId, name, text }) => GL.appendWorldChat(name, text, userId === GL.me._id));
+  GL.socket.on('game_guild_chat_message', ({ userId, name, text }) => {
+    GL.guildChatHistory.push({ userId, name, text });
+    while (GL.guildChatHistory.length > 60) GL.guildChatHistory.shift();
+    GL.appendGuildChat(name, text, userId === GL.me._id);
+  });
 
   GL.socket.on('game_zone_assigned', ({ mapId, zone }) => {
     if (!GL.map || GL.map.id !== mapId) return;

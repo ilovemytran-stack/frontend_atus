@@ -1,6 +1,6 @@
 /* ===== FEED CSS ===== */
-.mobile-header { display: none; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
-.mobile-header-logo { font-size: 1.2rem; font-weight: 800; background: linear-gradient(135deg, #fff, var(--brand)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.mobile-header { display: none; align-items: center; justify-content: space-between; padding: 12px 16px; position: sticky; top: 0; z-index: 50; border-radius: 0; border-left:0; border-right:0; border-top:0; }
+.mobile-header-logo { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; background: linear-gradient(135deg, #fff, var(--electric-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 @media (max-width: 768px) { .mobile-header { display: flex; } }
 
 /* Sidebar styles */
@@ -40,7 +40,17 @@
 .feed { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 16px; max-width: 640px; margin: 0 auto; }
 
 /* Post card */
-.post-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; animation: fadeIn 0.3s ease; }
+.post-card {
+  background:
+    radial-gradient(420px circle at 50% 0%, rgba(255,255,255,0.08), transparent 60%),
+    linear-gradient(180deg, var(--glass-fill-strong), var(--glass-fill));
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-lg);
+  overflow: hidden; animation: fadeIn 0.3s ease;
+  transition: transform var(--spring), box-shadow var(--spring);
+}
+.post-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-glass); }
 .post-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
 .post-header-info { flex: 1; min-width: 0; }
 .post-author { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 6px; }

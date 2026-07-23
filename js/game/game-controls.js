@@ -85,10 +85,11 @@ GL.onMonsterKilled = async function (m) {
   m.alive = false;
   m.respawnAt = performance.now() + (m.isBoss ? 45000 : 12000);
   try {
-    const res = await API.post('/game/character/kill-monster', { mapId: GL.map.id });
+    const res = await API.post('/game/character/kill-monster', { mapId: GL.map.id, isBoss: !!m.isBoss });
     if (res?.success) {
       GL.char = res.character;
       GL.toast(`+${res.loot.xp} EXP  +${res.loot.gold} 🪙${res.loot.gem ? '  +' + res.loot.gem + ' 💎' : ''}`);
+      if (res.loot.isBoss) GL.toast(`👑 Đã hạ ${res.loot.monster}!`, 'gl-toast-levelup');
       if (res.leveledUp?.length) {
         GL.toast(`LÊN CẤP ${res.character.level}!`, 'gl-toast-levelup');
         if (res.character.level % GL.data.pointsEvery === 0) GL.toast('Nhận điểm thuộc tính & kỹ năng mới!');

@@ -24,7 +24,7 @@ GL.startGodDuel = async function (tier) {
     over: false,
   };
   document.getElementById('glDuelGodName').textContent = res.god.name;
-  document.getElementById('glDuelGodPortrait').style.background = res.god.color;
+  document.getElementById('glDuelGodPortrait').style.background = `${res.god.color} url(/assets/game/gods/${res.duel.continentId}.png) center/cover`;
   document.getElementById('glDuelPlayerName').textContent = GL.char.name;
   document.getElementById('glDuelPlayerPortrait').style.backgroundImage = `url(${cls.portrait})`;
   document.getElementById('glDuelLog').innerHTML = '';

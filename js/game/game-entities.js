@@ -34,10 +34,22 @@ GL.spawnMonsters = function (map) {
   const pts = jitteredLine(count, npcZoneEnd, GL.WORLD.w - 100);
   const lvl = map.levelRange[1];
   pts.forEach((p, i) => {
-    let monsterId = map.monsterIds[i % map.monsterIds.length];
-    const isBoss = map.hasBoss && i === 0; // 1 boss đại diện trong map boss
-    const def = GL.data.monsters[monsterId];
-    const scaled = GLScaleMonster(def, lvl, isBoss, map.isMixedTier);
+    const isBossSlot = map.hasBoss && i === 0; // 1 Thần Hộ Vệ đại diện trong map boss
+    let monsterId, def, isBoss, scaled;
+    const guardian = isBossSlot ? GL.data.bosses.find((b) => b.continent === map.continentId) : null;
+    if (guardian) {
+      const cont = GL.data.continents.find((c) => c.id === map.continentId);
+      monsterId = guardian.id; def = { nameVN: guardian.name, color: cont.color, shape: 'knight' }; isBoss = true;
+      scaled = { ...GLGuardianBossStats(map.continentId, lvl), xp: 0, goldMin: 0, goldMax: 0 };
+      // Neo Thần Hộ Vệ ở vị trí cố định cách xa GOD_SPOT(1900)/BOSS_SPOT(2200) — map Celestia vừa có
+      // Thần Hộ Vệ riêng vừa có thể là nơi Chaoseraph lang thang tới, tránh 2 thanh máu chồng lên nhau.
+      p.x = 450; p.y = GL.GROUND_Y;
+    } else {
+      monsterId = map.monsterIds[i % map.monsterIds.length];
+      isBoss = isBossSlot; // hasBoss nhưng không có data BOSSES tương ứng: vẫn buff quái thường như cũ
+      def = GL.data.monsters[monsterId];
+      scaled = GLScaleMonster(def, lvl, isBoss, map.isMixedTier);
+    }
     list.push({
       uid: 'm' + i + '_' + Date.now(),
       defId: monsterId, def, isBoss,
@@ -62,6 +74,22 @@ function GLScaleMonster(def, mapLevel, isBoss, isMixTier) {
     xp: Math.round((8 + mapLevel * 2) * mult),
     goldMin: Math.round((2 + mapLevel * 0.6) * (isBoss ? 8 : 1)),
     goldMax: Math.round((6 + mapLevel * 1.2) * (isBoss ? 10 : 1)),
+  };
+}
+
+// Thần Hộ Vệ (Guardian Boss riêng của lục địa, đứng ở map role='boss') — bản sao rút gọn phía client
+// để hiển thị thanh máu mượt; server (guardianBossStatsFor) mới là nguồn thật khi trả thưởng.
+function GLGuardianBossStats(continentId, mapLevel) {
+  const cont = GL.data.continents.find((c) => c.id === continentId);
+  const mons = cont.monsters.map((id) => GL.data.monsters[id]);
+  const avgHp = mons.reduce((s, m) => s + m.baseHp, 0) / mons.length;
+  const avgAtk = mons.reduce((s, m) => s + m.baseAtk, 0) / mons.length;
+  const avgDef = mons.reduce((s, m) => s + m.baseDef, 0) / mons.length;
+  const lvGrow = 1 + (mapLevel - 1) * 0.12;
+  return {
+    hp: Math.round(avgHp * lvGrow * 14),
+    atk: Math.round(avgAtk * lvGrow * 2.6),
+    def: Math.round(avgDef * lvGrow * 2.2),
   };
 }
 
@@ -94,12 +122,13 @@ GL.updateMonsters = function (dt, now) {
     (GL.summons || []).forEach((s) => { if (!s.alive) return; const d = GL.distX(m, s); if (d < bestD) { target = s; bestD = d; } });
 
     if (m.state !== 'attack') {
-      if (bestD < 150) {
+      const leashDist = m.isBoss ? 400 : 260; // trần khoảng cách được dụ đi xa khỏi điểm gốc — quái/boss không bị kéo xuyên bản đồ
+      if (bestD < 150 && Math.abs(m.x - m.homeX) < leashDist) {
         m.state = 'chase';
         const dirX = target.x >= m.x ? 1 : -1;
         const spd = m.isBoss ? 55 : 70;
         if (bestD > 34) { m.x += dirX * spd * dt; m.dir = dirX; }
-      } else if (bestD > 220) {
+      } else if (bestD > 220 || Math.abs(m.x - m.homeX) >= leashDist) {
         const dirX = m.homeX >= m.x ? 1 : -1;
         if (Math.abs(m.x - m.homeX) > 6) { m.x += dirX * 40 * dt; }
         m.state = 'idle';

@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (target === 'glPanelMap') { renderMapPanel(); openPanelG('glPanelMap'); }
     else if (target === 'glPanelFriends') { loadFriends().then(() => renderFriendsPanel('list')); openPanelG('glPanelFriends'); }
     else if (target === 'glPanelNotif') { renderNotifPanel(); openPanelG('glPanelNotif'); }
+    else if (target === 'glPanelBestiary') { renderBestiaryPanel(); openPanelG('glPanelBestiary'); }
+    else if (target === 'glPanelWorldChat') { GL.worldChatPanelOpen = true; openPanelG('glPanelWorldChat'); }
+    else if (target === 'glPanelGuild') { renderGuildPanel(); openPanelG('glPanelGuild'); }
   });
 
   document.getElementById('glMenuLoadout').addEventListener('click', () => {
@@ -42,7 +45,7 @@ function renderLoadoutPanel() {
   body.innerHTML = `<div style="font-size:.72rem;color:var(--gl-text-dim);margin-bottom:10px">Chọn đúng 2 chiêu để hiện ra nút ① ② ngoài màn hình chiến đấu.</div>` +
     activeSkills.map((s) => `
       <div class="gl-loadout-item ${equipped.includes(s.id) ? 'equipped' : ''}" data-loadoutpick="${s.id}">
-        <div><b style="${s.color ? `color:${s.color}` : ''}">${s.name}</b><br><span style="color:var(--gl-text-dim);font-size:.65rem">${s.desc}</span></div>
+        <div><b style="${s.color ? `color:${s.color}` : ''}">${s.name}</b>${s.fromClass ? `<span style="color:var(--gl-text-dim);font-size:.6rem"> · của ${s.fromClass}</span>` : ''}<br><span style="color:var(--gl-text-dim);font-size:.65rem">${s.desc}</span></div>
         <span style="font-size:.68rem;color:var(--gl-xp)">${s.kiCost || 0} Ki</span>
       </div>`).join('');
   const picked = new Set(equipped);

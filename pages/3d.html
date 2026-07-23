@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>3D – Public</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Public">
+<meta name="theme-color" content="#0a0a0f">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/motion-simulation.css">
+<link rel="stylesheet" href="/css/threed.css">
+</head>
+<body class="gating">
+
+<!-- Sidebar thật của site — ẩn ngoài màn hình, mở bằng nút menu cạnh bộ chuyển mode -->
+<aside class="sidebar" id="sidebar"></aside>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- Bảng điều khiển chế độ Thiên Hà -->
+<div id="ui-panel" class="mode-panel">
+    <div class="control-group">
+        <label>Hình dạng</label>
+        <select id="shape-select">
+            <option value="galaxy">Dải Ngân Hà</option>
+            <option value="saturn">Vành Đai Sao Thổ</option>
+            <option value="heart">Tinh Vân Trái Tim</option>
+            <option value="flower">Hoa Sao Xung</option>
+        </select>
+    </div>
+    <div class="control-group">
+        <label>Màu Hào Quang</label>
+        <input type="color" id="color-picker" value="#3399ff">
+    </div>
+    <button id="fs-btn">Toàn Màn Hình</button>
+    <div class="status-badge" id="gesture-msg">Đang chờ Camera...</div>
+</div>
+
+<!-- Bảng điều khiển chế độ Vẽ Tay -->
+<div id="draw-panel" class="mode-panel">
+    <div class="control-group">
+        <label>Màu Mực</label>
+        <div class="swatch-row" id="swatch-row"></div>
+    </div>
+    <div class="control-group">
+        <label>Cỡ Cọ</label>
+        <div class="stepper">
+            <button class="step-btn" data-adjust="brush" data-dir="-1" aria-label="Giảm cỡ cọ">−</button>
+            <span id="brush-val">10</span>
+            <button class="step-btn" data-adjust="brush" data-dir="1" aria-label="Tăng cỡ cọ">+</button>
+        </div>
+    </div>
+    <div class="control-group">
+        <label>Cỡ Tẩy</label>
+        <div class="stepper">
+            <button class="step-btn" data-adjust="eraser" data-dir="-1" aria-label="Giảm cỡ tẩy">−</button>
+            <span id="eraser-val">46</span>
+            <button class="step-btn" data-adjust="eraser" data-dir="1" aria-label="Tăng cỡ tẩy">+</button>
+        </div>
+    </div>
+    <div class="control-group btn-row">
+        <button id="clear-btn">Xoá Hết</button>
+        <button id="save-btn">Lưu Ảnh</button>
+    </div>
+    <div class="status-badge" id="draw-msg">Đang chờ Camera...</div>
+</div>
+
+<div class="signature">Thiết kế bởi Anh Tú</div>
+
+<!-- Cổng xin quyền camera -->
+<div id="start-overlay">
+    <div id="start-card">
+        <h1>Gesture Galaxy</h1>
+        <p>Dùng camera để theo dõi chuyển động bàn tay của bạn theo thời gian thực. Mọi xử lý diễn ra ngay trên trình duyệt, không video nào được gửi lên máy chủ.</p>
+        <button id="start-btn">Bật Camera</button>
+        <p class="start-error" id="start-error"></p>
+    </div>
+</div>
+
+<video id="webcam" autoplay playsinline muted></video>
+<canvas id="draw-canvas"></canvas>
+
+<!-- Cụm điều khiển dưới cùng: menu (về site) + chuyển đổi mode -->
+<div id="bottom-cluster">
+    <button id="menu-btn" class="menu-fab" aria-label="Mở menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <div id="mode-switcher">
+        <button class="mode-btn active" data-mode="particles" aria-pressed="true">
+            <span class="mode-icon" aria-hidden="true">🌌</span><span>Thiên Hà</span>
+        </button>
+        <button class="mode-btn" data-mode="draw" aria-pressed="false">
+            <span class="mode-icon" aria-hidden="true">🖐️</span><span>Vẽ Tay</span>
+        </button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script type="module" src="/js/motion-simulation.js"></script>
+<script src="/js/threed.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => { Layout.init(); });
+</script>
+</body>
+</html>

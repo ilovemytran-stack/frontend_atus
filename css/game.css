@@ -29,6 +29,8 @@
 
 /* ---------- Character select ---------- */
 .gl-charselect{ position:fixed; inset:0; z-index:300; background:radial-gradient(ellipse at 50% 0%,#1c1830 0%,#05050a 65%); display:flex; flex-direction:column; padding:22px 18px 18px; overflow:hidden; }
+.gl-three-bg{ position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; opacity:.85; }
+.gl-charselect > *:not(.gl-three-bg){ position:relative; z-index:1; }
 .gl-exit-btn{ position:absolute; top:16px; right:16px; width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.06); border:1px solid var(--gl-gold-dim); color:var(--gl-text-dim); display:flex; align-items:center; justify-content:center; text-decoration:none; font-size:.9rem; }
 .gl-charselect-header{ text-align:center; margin-bottom:16px; }
 .gl-charselect-eyebrow{ font-size:.62rem; letter-spacing:.35em; color:var(--gl-text-dim); }
@@ -62,19 +64,42 @@
 .gl-bar-xp{ height:4px; }
 .gl-bar-ki{ background:rgba(255,255,255,.08); }
 .gl-bar-ki .gl-bar-fill{ background:linear-gradient(90deg,#3C7AC2,var(--gl-xp)); }
-.gl-bar-fill{ height:100%; width:0%; transition:width .25s ease; }
+.gl-bar-fill{ height:100%; width:0%; transition:width .25s ease; position:relative; overflow:hidden; }
+.gl-bar-fill::after{ content:''; position:absolute; inset:0; background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%); background-size:200% 100%; animation:gl-shimmer 2.6s ease-in-out infinite; }
+@keyframes gl-shimmer{ 0%{background-position:160% 0} 100%{background-position:-60% 0} }
 .gl-bar-hp .gl-bar-fill{ background:linear-gradient(90deg,#c23a2c,var(--gl-hp)); }
 .gl-bar-xp .gl-bar-fill{ background:var(--gl-xp); }
 .gl-bar-label{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:.55rem; font-weight:700; text-shadow:0 1px 2px #000; }
 .gl-currency{ display:flex; flex-direction:column; gap:2px; font-size:.68rem; font-weight:700; border-left:1px solid var(--gl-gold-dim); padding-left:8px; }
 .gl-cur{ display:flex; align-items:center; gap:4px; }
+.gl-cur-icon.gl-gold{ color:var(--gl-gold-2); }
+.gl-cur-icon.gl-gem{ color:#7FD8E8; }
+
+/* ===== Hệ icon SVG đơn sắc (thay emoji) — kích thước qua .gl-icon, màu ăn theo currentColor ===== */
+.gl-icon{ width:1.15em; height:1.15em; flex:0 0 auto; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; }
+.gl-icon-sm{ width:.85em; height:.85em; }
+.gl-icon-lg{ width:1.6em; height:1.6em; }
+
+/* ===== Chuyển động mượt cho panel + nút bấm ===== */
+@keyframes gl-fade-in{ from{opacity:0} to{opacity:1} }
+@keyframes gl-pop-in{ from{opacity:0; transform:scale(.93) translateY(10px)} to{opacity:1; transform:scale(1) translateY(0)} }
+@keyframes gl-toast-in{ from{opacity:0; transform:translate(-50%,-6px) scale(.96)} to{opacity:1; transform:translate(-50%,0) scale(1)} }
+.gl-panel-overlay{ animation:gl-fade-in .16s ease; }
+.gl-panel-overlay .gl-panel{ animation:gl-pop-in .22s cubic-bezier(.2,.85,.32,1); }
+.gl-icon-btn, .gl-menu-item, .gl-btn-sm, .gl-cta-btn, .gl-attack-btn, .gl-skill-btn, .gl-tab, .gl-item-chip, .gl-panel-close{
+  transition:transform .14s ease, background-color .18s ease, border-color .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+.gl-icon-btn:active, .gl-menu-item:active, .gl-attack-btn:active, .gl-skill-btn:active, .gl-btn-sm:active, .gl-cta-btn:active{ transform:scale(.93); }
+.gl-menu-item:not(:disabled):hover, .gl-item-chip:hover{ border-color:var(--gl-gold-2); background:rgba(255,255,255,.06); }
+.gl-panel-close:hover{ color:var(--gl-text); transform:rotate(90deg); }
+* { scrollbar-width:thin; scrollbar-color:var(--gl-gold-dim) transparent; }
 
 .gl-icon-btn{ width:46px; height:46px; border-radius:50%; background:rgba(8,7,14,.72); border:1px solid var(--gl-gold-dim); color:var(--gl-text); font-size:1.15rem; display:flex; align-items:center; justify-content:center; position:relative; backdrop-filter:blur(6px); }
 .gl-corner-tl{ position:absolute; top:calc(env(safe-area-inset-top) + 8px); left:12px; z-index:20; }
 .gl-corner-tr{ position:absolute; top:calc(env(safe-area-inset-top) + 8px); right:12px; z-index:20; display:flex; gap:8px; }
 .gl-notif-dot{ position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%; background:var(--gl-hp); border:1.5px solid var(--gl-bg); }
 
-.gl-joystick-zone{ position:absolute; left:0; bottom:0; width:42%; height:58%; z-index:15; }
+.gl-joystick-zone{ position:absolute; left:0; bottom:0; width:min(46vw,230px); height:min(34vh,220px); z-index:15; }
 .gl-joystick-base{ position:absolute; left:14px; bottom:calc(env(safe-area-inset-bottom) + 34px); width:150px; height:74px; border-radius:99px; background:rgba(255,255,255,.06); border:2px solid var(--gl-gold-dim); }
 .gl-joystick-base::before, .gl-joystick-base::after{ content:''; position:absolute; top:50%; width:0; height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; transform:translateY(-50%); opacity:.5; }
 .gl-joystick-base::before{ left:10px; border-right:9px solid var(--gl-gold); }
@@ -112,6 +137,7 @@
 .gl-chatbar{ position:absolute; left:12px; bottom:150px; z-index:21; display:flex; gap:6px; width:min(60%,320px); }
 .gl-chatbar input{ flex:1; background:rgba(8,7,14,.85); border:1px solid var(--gl-gold-dim); border-radius:99px; padding:7px 12px; font-size:.72rem; color:var(--gl-text); outline:none; }
 .gl-chatbar button{ background:var(--gl-gold-2); border:none; border-radius:99px; padding:0 12px; font-size:.7rem; font-weight:700; }
+.gl-chat-close{ flex:0 0 auto; width:26px; padding:0 !important; background:rgba(8,7,14,.85) !important; color:var(--gl-text-dim); border:1px solid var(--gl-gold-dim) !important; }
 
 .gl-floattoast{ position:absolute; top:90px; left:50%; transform:translateX(-50%); z-index:25; display:flex; flex-direction:column; align-items:center; gap:4px; pointer-events:none; }
 .gl-toast-item{ font-size:.72rem; font-weight:700; padding:4px 12px; border-radius:99px; background:rgba(8,7,14,.75); border:1px solid var(--gl-gold-dim); animation:glFloatUp 1.8s ease forwards; }
@@ -122,8 +148,8 @@
 @keyframes glDmgUp{ 0%{ opacity:1; transform:translateY(0);} 100%{ opacity:0; transform:translateY(-34px);} }
 
 /* ---------- Panels ---------- */
-.gl-panel-overlay{ position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; padding:10px; }
-.gl-panel{ width:min(94vw,640px); max-height:88vh; background:linear-gradient(180deg,#181524,#0d0c14); border:1px solid var(--gl-gold-dim); border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+.gl-panel-overlay{ position:fixed; inset:0; z-index:400; background:rgba(6,5,10,.66); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; padding:10px; }
+.gl-panel{ width:min(94vw,640px); max-height:88vh; background:linear-gradient(180deg,#181524,#0d0c14); border:1px solid var(--gl-gold-dim); border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 70px rgba(0,0,0,.55), 0 0 0 1px rgba(245,208,97,.05), inset 0 1px 0 rgba(255,255,255,.04); }
 .gl-panel-head{ display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.08); font-family:var(--gl-font-display); letter-spacing:.08em; font-size:.8rem; color:var(--gl-gold); }
 .gl-panel-close{ background:none; border:none; color:var(--gl-text-dim); font-size:1rem; cursor:pointer; }
 .gl-panel-tabs{ display:flex; gap:4px; padding:8px 12px 0; border-bottom:1px solid rgba(255,255,255,.06); }

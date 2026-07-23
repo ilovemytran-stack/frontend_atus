@@ -26,15 +26,15 @@ GL.initWorldEventsSocket = function () {
   GL.socket.on('boss_spawned', ({ mapId, form, hp, maxHp, singleFormMode }) => {
     if (GL.map && GL.map.id === mapId) {
       GL.worldBoss = { mapId, form, hp, maxHp, singleFormMode };
-      GL.toast('👑 BOSS THẾ GIỚI đã xuất hiện!', 'gl-toast-levelup');
+      GL.toast('👑 CHAOSERAPH đã xuất hiện!', 'gl-toast-levelup');
     }
   });
-  GL.socket.on('boss_despawned', () => { if (GL.worldBoss) { GL.toast('Boss Thế Giới đã biến mất'); GL.worldBoss = null; } });
+  GL.socket.on('boss_despawned', () => { if (GL.worldBoss) { GL.toast('Chaoseraph đã biến mất'); GL.worldBoss = null; } });
   GL.socket.on('boss_hp_update', ({ hp, maxHp }) => { if (GL.worldBoss) { GL.worldBoss.hp = hp; GL.worldBoss.maxHp = maxHp; if (GL.selectedTarget === GL.worldBoss) GL.updateTargetFrame(); } });
   GL.socket.on('boss_form_changed', ({ form, hp, maxHp }) => {
     if (GL.worldBoss) { GL.worldBoss.form = form; GL.worldBoss.hp = hp; GL.worldBoss.maxHp = maxHp; GL.toast(`⚠️ Boss chuyển sang Dạng ${form}!`); }
   });
-  GL.socket.on('boss_killed', () => { GL.toast('💀 BOSS THẾ GIỚI ĐÃ BỊ HẠ GỤC!', 'gl-toast-levelup'); GL.worldBoss = null; });
+  GL.socket.on('boss_killed', () => { GL.toast('💀 CHAOSERAPH ĐÃ BỊ HẠ GỤC!', 'gl-toast-levelup'); GL.worldBoss = null; });
   GL.socket.on('boss_kill_reward', ({ vipCoin, drops }) => {
     GL.toast(`Phần thưởng: +${vipCoin} Xu VIP, +1 Đá Nâng Cấp${drops.length ? ', +' + drops.length + ' trang bị đặc biệt!' : ''}`);
   });
@@ -43,7 +43,7 @@ GL.initWorldEventsSocket = function () {
   GL.socket.on('world_boss_alert', (info) => {
     if (info.type === 'spawned') {
       GL.lastBossAlert = info;
-      GL.toast(`👑 Boss Thế Giới xuất hiện tại ${info.continentName} · ${info.mapName}!`, 'gl-toast-levelup');
+      GL.toast(`👑 Chaoseraph xuất hiện tại ${info.continentName} · ${info.mapName}!`, 'gl-toast-levelup');
       document.getElementById('glNotifDot').style.display = 'block';
     } else {
       GL.lastBossAlert = null;

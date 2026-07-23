@@ -12,6 +12,7 @@
 <meta name="theme-color" content="#0a0a0f">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/motion-simulation.css">
 <link rel="stylesheet" href="/css/feed.css">
 <style>
 .admin-layout { padding: 20px; max-width: 1200px; margin: 0 auto; }
@@ -26,6 +27,7 @@
 .admin-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
 .admin-toolbar .input { max-width: 280px; }
 .admin-table-wrap { overflow-x: auto; }
+.ann-compose { position: relative; overflow: hidden; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; }
 .admin-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border); }
 .admin-table th { text-align: left; padding: 12px 16px; background: var(--bg-elevated); font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
 .admin-table td { padding: 10px 16px; border-top: 1px solid var(--border); font-size: 0.86rem; vertical-align: middle; }
@@ -64,6 +66,7 @@
     <div class="admin-tab" data-tab="posts">📝 Bài viết</div>
     <div class="admin-tab" data-tab="videos">🎬 Video</div>
     <div class="admin-tab" data-tab="gmgame">🎮 GM Game</div>
+    <div class="admin-tab" data-tab="announcements">📢 Thông Báo</div>
   </div>
 
   <div class="admin-toolbar">
@@ -110,6 +113,26 @@
       </table>
     </div>
   </div>
+
+  <div id="panel-announcements" class="admin-panel" style="display:none">
+    <div class="ann-compose">
+      <canvas id="annComposeThree" style="position:absolute;inset:0;width:100%;height:100%;opacity:.35;pointer-events:none;-webkit-mask-image:radial-gradient(ellipse at 85% 0%,#000 0%,transparent 65%);mask-image:radial-gradient(ellipse at 85% 0%,#000 0%,transparent 65%)"></canvas>
+      <div style="position:relative;z-index:1">
+      <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:10px">Gửi thông báo sẽ hiện ra giữa màn hình cho <b>mọi người dùng</b> ở trang chủ, và tự hiện lại cho tới khi họ đóng/ẩn hoặc có thông báo mới thay thế.</div>
+      <textarea id="annText" class="input" rows="3" maxlength="1000" placeholder="Nhập nội dung thông báo…" style="width:100%;resize:vertical;font-family:inherit"></textarea>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary btn-sm" id="annConfirmBtn">Xác nhận gửi</button>
+        <button class="btn btn-secondary btn-sm" id="annCloseBtn">Đóng</button>
+      </div>
+      </div>
+    </div>
+    <div class="admin-table-wrap" style="margin-top:18px">
+      <table class="admin-table">
+        <thead><tr><th>Nội dung</th><th>Người gửi</th><th>Trạng thái</th><th>Thời gian</th><th>Hành động</th></tr></thead>
+        <tbody id="annTbody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 <div id="accessDenied" class="access-denied" style="display:none">
   <div style="font-size:48px;margin-bottom:16px">🚫</div>
@@ -120,8 +143,11 @@
   </main>
 </div>
 <div id="toast-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="/js/three-orb.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/layout.js"></script>
+<script type="module" src="/js/motion-simulation.js"></script>
 <script>
 const state = { tab: 'users', page: { users: 1, posts: 1, videos: 1 }, search: '' };
 
@@ -138,6 +164,9 @@ async function checkAccessAndInit() {
   document.getElementById('adminContent').style.display = 'block';
   await loadStats();
   await loadUsers();
+
+  document.getElementById('annConfirmBtn').addEventListener('click', submitAnnouncement);
+  document.getElementById('annCloseBtn').addEventListener('click', () => { document.getElementById('annText').value = ''; });
 
   document.querySelectorAll('.admin-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -167,6 +196,7 @@ function loadTab(tab) {
   if (tab === 'posts') return loadPosts();
   if (tab === 'videos') return loadVideos();
   if (tab === 'gmgame') return loadGmChars();
+  if (tab === 'announcements') return loadAnnouncements();
 }
 
 async function loadStats() {
@@ -361,6 +391,41 @@ async function gmCompleteQuests(id, name) {
   if (!confirm(`Đánh dấu hoàn thành nhiệm vụ hiện tại cho ${name}?`)) return;
   const res = await API.put(`/admin/game/characters/${id}/complete-quests`, {});
   if (res?.success) Toast.success(res.message); else Toast.error(res?.message || 'Lỗi');
+}
+
+async function loadAnnouncements() {
+  if (!state.annThreeInited && window.initThreeOrb) {
+    window.initThreeOrb(document.getElementById('annComposeThree'), { color: 0x7c5cfc, accent: 0xff5ca8, particles: 50 });
+    state.annThreeInited = true;
+  }
+  const res = await API.get('/admin/announcements');
+  if (!res?.success) return;
+  document.getElementById('annTbody').innerHTML = res.announcements.length ? res.announcements.map(a => `
+    <tr>
+      <td style="max-width:360px;white-space:pre-wrap">${esc(a.text)}</td>
+      <td>${esc(a.createdBy?.displayName || a.createdBy?.username || '?')}</td>
+      <td>${a.active ? '<span style="color:var(--accent-green);font-weight:700">Đang hiện</span>' : '<span style="color:var(--text-muted)">Đã tắt</span>'}</td>
+      <td>${new Date(a.createdAt).toLocaleString('vi-VN')}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="deleteAnnouncement('${a._id}')">Xoá</button></td>
+    </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Chưa có thông báo nào</td></tr>';
+}
+
+async function submitAnnouncement() {
+  const text = document.getElementById('annText').value.trim();
+  if (!text) { Toast.error('Nhập nội dung thông báo trước đã'); return; }
+  if (!confirm('Gửi thông báo này cho toàn bộ người dùng?')) return;
+  const res = await API.post('/admin/announcements', { text });
+  if (res?.success) {
+    Toast.success('Đã gửi thông báo!');
+    document.getElementById('annText').value = '';
+    loadAnnouncements();
+  } else Toast.error(res?.message || 'Lỗi');
+}
+
+async function deleteAnnouncement(id) {
+  if (!confirm('Xoá thông báo này?')) return;
+  const res = await API.delete(`/admin/announcements/${id}`);
+  if (res?.success) { Toast.success('Đã xoá'); loadAnnouncements(); } else Toast.error(res?.message || 'Lỗi');
 }
 
 checkAccessAndInit();
