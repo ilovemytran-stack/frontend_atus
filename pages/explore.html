@@ -9,14 +9,15 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Public">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#0B0D10">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/liquid-glass.css">
 <link rel="stylesheet" href="/css/motion-simulation.css">
 <link rel="stylesheet" href="/css/feed.css">
 <style>
 .explore-search { padding: 16px; max-width: 640px; margin: 0 auto; }
-.explore-search .input-wrap { background: var(--bg-elevated); border-radius: var(--radius-full); border: 1px solid var(--border); }
+.explore-search .input-wrap { background: var(--glass-fill); border-radius: var(--radius-full); border: 1px solid var(--glass-border); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); }
 .explore-search .input { padding: 12px 16px 12px 44px; }
 .explore-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; max-width: 640px; margin: 0 auto; padding: 0 3px; }
 .explore-item { position: relative; aspect-ratio: 1; overflow: hidden; cursor: pointer; }
@@ -35,14 +36,14 @@
 
   <main class="main-content">
     <header class="mobile-header">
-      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <button class="btn btn-ghost btn-icon" id="menu-btn" aria-label="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="mobile-header-logo">Khám phá</div>
       <div style="width:40px"></div>
     </header>
 
     <div class="explore-search">
       <div class="input-wrap">
-        <span class="input-icon">🔍</span>
+        <span class="input-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
         <input class="input" id="searchInput" placeholder="Tìm kiếm người dùng, bài viết, video..." oninput="handleSearch()">
       </div>
     </div>
@@ -61,6 +62,7 @@
 <nav class="bottom-nav" id="bottom-nav"></nav>
 <script src="/js/api.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/liquid-glass.js"></script>
 <script type="module" src="/js/motion-simulation.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {

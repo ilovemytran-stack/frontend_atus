@@ -32,9 +32,9 @@
   border-radius: var(--radius-xl);
   transition: transform var(--spring);
 }
-.glass-sidebar ~ .main-content, body:has(.glass-sidebar) .main-content { margin-left: calc(var(--sidebar-w) + 24px); }
+.main-content.has-glass-sidebar { margin-left: calc(var(--sidebar-w) + 24px); }
 @media (max-width: 768px) {
-  .glass-sidebar ~ .main-content, body:has(.glass-sidebar) .main-content { margin-left: 0; }
+  .main-content.has-glass-sidebar { margin-left: 0; }
 }
 
 /* ---------- Top bar kính nổi (desktop) — chứa ô tìm kiếm ---------- */
@@ -72,11 +72,19 @@
 /* ---------- Nút kính ---------- */
 .glass-btn {
   position: relative; overflow: hidden;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
   transition: transform var(--spring), background var(--spring);
 }
-.glass-btn:hover { transform: scale(1.035); }
+.glass-btn:hover { transform: scale(1.035); background: var(--glass-fill-strong); }
 .glass-btn:active { transform: scale(0.96); }
+/* Nút nav (sidebar/bottom-nav) đã có màu riêng theo trạng thái active/hover
+   trong global.css — không cần nền mặc định của .glass-btn đè lên, chỉ giữ
+   lại hiệu ứng bấm/gợn sóng. */
+.sidebar-item.glass-btn, .bottom-nav-item.glass-btn { background: transparent; border-color: transparent; }
+.sidebar-item.glass-btn:hover, .bottom-nav-item.glass-btn:hover { background: var(--glass-fill); }
+.sidebar-item.glass-btn.active, .bottom-nav-item.glass-btn.active { background: var(--glass-fill-strong); border-color: var(--glass-border); }
 
 /* Gợn sóng khi bấm — spawn bằng liquid-glass.js */
 .lg-ripple {

@@ -9,9 +9,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Public">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#0B0D10">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/liquid-glass.css">
 <link rel="stylesheet" href="/css/motion-simulation.css">
 <link rel="stylesheet" href="/css/feed.css">
 <link rel="stylesheet" href="/css/profile.css">
@@ -23,7 +24,7 @@
 
   <main class="main-content">
     <header class="mobile-header">
-      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <button class="btn btn-ghost btn-icon" id="menu-btn" aria-label="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="mobile-header-logo" id="mobileTitle">Trang cá nhân</div>
       <div style="width:40px"></div>
     </header>
@@ -54,7 +55,7 @@
 
     <div class="profile-tabs">
       <button class="feed-tab active" data-tab="posts" onclick="switchProfileTab('posts')">📝 Bài viết</button>
-      <button class="feed-tab" data-tab="videos" onclick="switchProfileTab('videos')">🎬 Video</button>
+      <button class="feed-tab" data-tab="videos" onclick="switchProfileTab('videos')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>Video</button>
     </div>
 
     <div id="profilePosts" class="feed"></div>
@@ -75,7 +76,7 @@
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title">Chỉnh sửa trang cá nhân</div>
-      <button class="modal-close btn btn-ghost btn-icon" onclick="closeEditModal()">✕</button>
+      <button class="modal-close btn btn-ghost btn-icon" onclick="closeEditModal()" aria-label="Đóng"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="input-group">
@@ -109,10 +110,10 @@
   <div class="modal" style="max-width:320px">
     <div class="modal-header">
       <div class="modal-title">Ảnh đại diện</div>
-      <button class="modal-close btn btn-ghost btn-icon" onclick="closeAvatarMenu()">✕</button>
+      <button class="modal-close btn btn-ghost btn-icon" onclick="closeAvatarMenu()" aria-label="Đóng"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-secondary" onclick="closeAvatarMenu();document.getElementById('avatarInput').click()">🖼 Đổi ảnh đại diện</button>
+      <button class="btn btn-secondary" onclick="closeAvatarMenu();document.getElementById('avatarInput').click()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>Đổi ảnh đại diện</button>
       <button class="btn btn-danger" id="deleteAvatarBtn" onclick="deleteAvatar()">🗑 Xóa ảnh đại diện</button>
     </div>
   </div>
@@ -123,13 +124,13 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-header">
       <div class="modal-title">Căn chỉnh ảnh đại diện</div>
-      <button class="modal-close btn btn-ghost btn-icon" onclick="closeCropModal()">✕</button>
+      <button class="modal-close btn btn-ghost btn-icon" onclick="closeCropModal()" aria-label="Đóng"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div class="crop-stage" id="cropStage">
       <img id="cropImage" alt="">
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
-      <span style="font-size:0.8rem;color:var(--text-muted)">🔍</span>
+      <span style="font-size:0.8rem;color:var(--text-muted)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
       <input type="range" id="cropZoom" min="100" max="300" value="100" style="flex:1">
     </div>
     <div style="font-size:0.78rem;color:var(--text-muted);text-align:center;margin-top:6px">Kéo ảnh để căn chỉnh vị trí, dùng thanh trượt để phóng to/thu nhỏ</div>
@@ -146,7 +147,7 @@
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title" id="followModalTitle">Người theo dõi</div>
-      <button class="modal-close btn btn-ghost btn-icon" onclick="closeFollowModal()">✕</button>
+      <button class="modal-close btn btn-ghost btn-icon" onclick="closeFollowModal()" aria-label="Đóng"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
     <div id="followList" style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
   </div>
@@ -156,6 +157,7 @@
 
 <script src="/js/api.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/liquid-glass.js"></script>
 <script type="module" src="/js/motion-simulation.js"></script>
 <script src="/js/profile.js"></script>
 </body>

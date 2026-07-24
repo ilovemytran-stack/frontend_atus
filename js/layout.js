@@ -57,6 +57,7 @@ class Layout {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
     sidebar.classList.add('glass', 'glass-sidebar'); // vô hại nếu trang chưa link liquid-glass.css — chỉ là class rỗng
+    document.querySelector('.main-content')?.classList.add('has-glass-sidebar'); // đẩy nội dung chính ra đúng khoảng trống của sidebar nổi — làm bằng JS cho chắc, không phụ thuộc selector CSS phức tạp
     const current = location.pathname.split('/').pop();
     const navItems = [
       { href: 'index.html', icon: Icon.home, label: 'Trang chủ' },
@@ -78,7 +79,7 @@ class Layout {
     }
     sidebar.innerHTML = `
       <div class="sidebar-logo">
-        <div class="sidebar-logo-icon">🌐</div>
+        <div class="sidebar-logo-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--electric-cyan, var(--brand))"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10Z"/></svg></div>
         <span class="sidebar-logo-text">Public</span>
       </div>
       <nav class="sidebar-nav">

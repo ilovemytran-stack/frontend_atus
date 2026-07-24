@@ -9,20 +9,21 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Public">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#0B0D10">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/liquid-glass.css">
 <link rel="stylesheet" href="/css/motion-simulation.css">
 <link rel="stylesheet" href="/css/feed.css">
 <style>
 .notif-page { max-width: 600px; margin: 0 auto; }
 .notif-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid var(--border); }
 .notif-header h2 { font-size: 1.3rem; font-weight: 800; }
-.notif-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; transition: var(--transition); position: relative; }
-.notif-item:hover { background: var(--bg-elevated); }
-.notif-item.unread { background: rgba(124,92,252,0.06); }
-.notif-item.unread::before { content: ''; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; background: var(--brand); border-radius: 50%; }
-.notif-icon { font-size: 18px; }
+.notif-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; transition: var(--transition); position: relative; border-radius: var(--radius-md); }
+.notif-item:hover { background: var(--glass-fill); }
+.notif-item.unread { background: linear-gradient(135deg, rgba(34,211,238,0.07), rgba(139,92,246,0.07)); }
+.notif-item.unread::before { content: ''; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; background: var(--electric-cyan); border-radius: 50%; }
+.notif-icon { color: var(--text-secondary); flex-shrink: 0; }
 .notif-text { flex: 1; font-size: 0.9rem; line-height: 1.4; }
 .notif-text strong { font-weight: 700; }
 .notif-time { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
@@ -36,7 +37,7 @@
 
   <main class="main-content">
     <header class="mobile-header">
-      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <button class="btn btn-ghost btn-icon" id="menu-btn" aria-label="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="mobile-header-logo">Thông báo</div>
       <div style="width:40px"></div>
     </header>
@@ -48,7 +49,7 @@
       </div>
       <div id="notifList"></div>
       <div id="notifEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--text-muted)">
-        <div style="font-size:48px;margin-bottom:12px">🔔</div>
+        <div style="margin-bottom:12px;color:var(--electric-cyan)"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
         <p>Chưa có thông báo nào</p>
       </div>
     </div>
@@ -58,13 +59,19 @@
 <div id="toast-container"></div>
 <script src="/js/api.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/liquid-glass.js"></script>
 <script type="module" src="/js/motion-simulation.js"></script>
 <script>
 if (!API.requireAuth()) {}
 
 document.addEventListener('DOMContentLoaded', () => { Layout.init(); loadNotifications(); });
 
-const ICONS = { like: '❤️', comment: '💬', follow: '👤', share: '🔗', video_like: '❤️', video_comment: '💬' };
+const ICON_HEART = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-6.7-4.35-9.3-8.2C.8 9.7 1.9 6 5.1 5c2.1-.65 4 .3 4.9 1.9C10.9 5.3 12.8 4.35 14.9 5c3.2 1 4.3 4.7 2.4 7.8C18.7 16.65 12 21 12 21z"/></svg>';
+const ICON_COMMENT = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.4 8.5 8.5 0 0 1-4-1L3 20l1.1-3.4A8.5 8.5 0 1 1 21 11.5Z"/></svg>';
+const ICON_FOLLOW = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>';
+const ICON_SHARE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/></svg>';
+const ICON_BELL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+const ICONS = { like: ICON_HEART, comment: ICON_COMMENT, follow: ICON_FOLLOW, share: ICON_SHARE, video_like: ICON_HEART, video_comment: ICON_COMMENT };
 const TEXTS = {
   like: 'đã thích bài viết của bạn',
   comment: 'đã bình luận về bài viết của bạn',
@@ -88,7 +95,7 @@ async function loadNotifications() {
         <strong>${n.sender?.displayName || n.sender?.username}</strong> ${TEXTS[n.type] || ''}
         <div class="notif-time">${timeAgo(n.createdAt)}</div>
       </div>
-      <span class="notif-icon">${ICONS[n.type] || '🔔'}</span>
+      <span class="notif-icon">${ICONS[n.type] || ICON_BELL}</span>
       ${n.post?.images?.[0]?.url ? `<img src="${n.post.images[0].url}" class="notif-thumb" alt="">` : ''}
       ${n.video?.thumbnail ? `<img src="${n.video.thumbnail}" class="notif-thumb" alt="">` : ''}
     </a>`).join('');

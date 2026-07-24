@@ -1,6 +1,6 @@
 /* ===== CHAT ===== */
 .chat-layout { display: flex; height: 100dvh; }
-.chat-list { width: 340px; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+.chat-list { width: 340px; border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; flex-shrink: 0; background: var(--glass-fill); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); }
 .chat-list-header { display: flex; align-items: center; justify-content: space-between; padding: 16px; }
 .chat-list-header h2 { font-size: 1.3rem; font-weight: 800; }
 .chat-list-header #menu-btn { display: none; }
@@ -12,8 +12,8 @@
 .user-search-item:hover { background: var(--bg-hover); }
 
 .conversation-list { flex: 1; overflow-y: auto; }
-.conv-item { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; transition: var(--transition); position: relative; }
-.conv-item:hover, .conv-item.active { background: var(--bg-elevated); }
+.conv-item { display: flex; align-items: center; gap: 10px; padding: 12px 16px; cursor: pointer; transition: var(--transition); position: relative; border-radius: var(--radius-md); margin: 0 6px; }
+.conv-item:hover, .conv-item.active { background: var(--glass-fill-strong); }
 .conv-avatar-wrap { position: relative; flex-shrink: 0; }
 .conv-avatar-wrap .online-dot { position: absolute; bottom: 0; right: 0; }
 .conv-info { flex: 1; min-width: 0; }
@@ -33,8 +33,8 @@
 .msg-row { display: flex; gap: 8px; max-width: 70%; align-items: flex-end; }
 .msg-row.mine { align-self: flex-end; flex-direction: row-reverse; }
 .msg-bubble { padding: 10px 14px; border-radius: 18px; font-size: 0.9rem; line-height: 1.4; word-break: break-word; }
-.msg-row:not(.mine) .msg-bubble { background: var(--bg-elevated); border-bottom-left-radius: 4px; }
-.msg-row.mine .msg-bubble { background: var(--brand); color: #fff; border-bottom-right-radius: 4px; }
+.msg-row:not(.mine) .msg-bubble { background: var(--glass-fill-strong); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-border); border-bottom-left-radius: 4px; }
+.msg-row.mine .msg-bubble { background: linear-gradient(135deg, var(--royal-blue), var(--violet)); color: #fff; border-bottom-right-radius: 4px; }
 .msg-bubble img { border-radius: 12px; max-width: 220px; cursor: pointer; }
 .msg-time { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
 

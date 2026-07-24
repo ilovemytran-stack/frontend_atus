@@ -153,16 +153,41 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .main-content { flex: 1; margin-left: var(--sidebar-w); min-height: 100dvh; }
 .right-sidebar { position: fixed; top: 0; right: 0; width: 280px; height: 100dvh; padding: 24px 16px; overflow-y: auto; }
 
+/* Mobile header (chuyển từ feed.css — mọi trang đều cần, không chỉ trang có feed) */
+.mobile-header { display: none; align-items: center; justify-content: space-between; padding: 12px 16px; position: sticky; top: 0; z-index: 50; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+.mobile-header-logo { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; background: linear-gradient(135deg, #fff, var(--electric-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+@media (max-width: 768px) { .mobile-header { display: flex; } }
+
+/* Sidebar content (chuyển từ feed.css — mọi trang đều cần, không chỉ trang có feed) */
+.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 20px 16px 12px; }
+.sidebar-logo-icon { font-size: 24px; }
+.sidebar-logo-text { font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; background: linear-gradient(135deg, #fff, var(--electric-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.sidebar-nav { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.sidebar-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; transition: var(--transition); position: relative; background: transparent; border: 1px solid transparent; }
+.sidebar-item:hover { background: var(--glass-fill, var(--bg-elevated)); color: var(--text-primary); border-color: var(--glass-border, transparent); }
+.sidebar-item.active { background: var(--glass-fill-strong, rgba(59,91,255,0.14)); color: var(--electric-cyan, var(--brand)); border-color: var(--glass-border, transparent); }
+.sidebar-icon { font-size: 20px; width: 24px; text-align: center; }
+.sidebar-badge { position: absolute; right: 12px; min-width: 20px; height: 20px; background: var(--accent-pink); color: #fff; border-radius: var(--radius-full); font-size: 0.7rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.sidebar-actions { padding: 8px 16px; }
+.sidebar-post-btn { width: 100%; }
+.sidebar-user { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--border); margin-top: auto; }
+.sidebar-user .btn-icon { color: var(--text-muted); transition: var(--transition); }
+.sidebar-user .btn-icon:hover { background: rgba(252,92,92,0.15); color: var(--danger); }
+.sidebar-user-info { flex: 1; min-width: 0; }
+.sidebar-user-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-user-handle { font-size: 0.78rem; color: var(--text-muted); }
+
 /* Bottom nav (mobile) */
 .bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: var(--bottomnav-h); background: var(--bg-card); border-top: 1px solid var(--border); z-index: 100; display: none; align-items: center; justify-content: space-around; padding-bottom: env(safe-area-inset-bottom); }
-.bottom-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.65rem; font-weight: 500; transition: var(--transition); flex: 1; padding: 8px 0; position: relative; }
-.bottom-nav-item.active { color: var(--brand); }
+.bottom-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.65rem; font-weight: 500; transition: var(--transition); flex: 1; padding: 8px 4px; margin: 4px; border-radius: var(--radius-md); position: relative; }
+.bottom-nav-item:hover, .bottom-nav-item:active { background: var(--glass-fill); }
+.bottom-nav-item.active { color: var(--electric-cyan); background: var(--glass-fill-strong); }
 .bottom-nav-item .icon { font-size: 22px; }
 
 .icon-svg { display: block; }
 .sidebar-icon, .bottom-nav-item .icon, .btn-icon { display: inline-flex; align-items: center; justify-content: center; }
 .sidebar-icon svg, .bottom-nav-item .icon svg { transition: var(--transition); }
-.sidebar-item.active .icon-svg, .bottom-nav-item.active .icon-svg { color: var(--brand); }
+.sidebar-item.active .icon-svg, .bottom-nav-item.active .icon-svg { color: var(--electric-cyan); }
 
 /* G.Legendary sidebar entry */
 .sidebar-item-game { position: relative; background: linear-gradient(90deg, rgba(245,184,76,0.14), transparent); border-radius: var(--radius-sm); }

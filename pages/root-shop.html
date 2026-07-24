@@ -8,9 +8,20 @@
 <style>
   html, body { margin: 0; padding: 0; background: #0a0d0c; }
 </style>
+<!-- Chỉ để render Sidebar/Bottom Nav dùng chung của site — KHÔNG đụng gì tới
+     giao diện riêng của Root Shop ở trên. -->
+<link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/liquid-glass.css">
 </head>
 <body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <div class="main-content has-glass-sidebar" style="padding:0;overflow:visible">
 <div id="root"></div>
+  </div>
+</div>
+<nav class="bottom-nav" id="bottom-nav"></nav>
 
 <script>
 // Shim window.storage (API lưu trữ vốn chỉ có trong artifact Claude) bằng localStorage
@@ -2306,5 +2317,9 @@ const __root = createRoot(document.getElementById('root'));
 __root.render(React.createElement(RootShop));
 
 </script>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/liquid-glass.js"></script>
+<script>document.addEventListener('DOMContentLoaded', () => Layout.init());</script>
 </body>
 </html>

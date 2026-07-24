@@ -7,6 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Chỉ để render Sidebar/Bottom Nav dùng chung của site — KHÔNG đụng gì tới
+     giao diện riêng (hacker/terminal) của Atelier ở <style> ngay dưới đây. -->
+<link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/liquid-glass.css">
 <style>
 /* ============================================================
    TOKENS — hacker / security-terminal system: void-black canvas,
@@ -675,6 +679,10 @@ input:disabled, .chip:disabled, .mini-btn:disabled{ opacity:.35; pointer-events:
 </style>
 </head>
 <body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <div class="main-content has-glass-sidebar" style="padding:0;overflow:visible">
 <div class="app" id="app">
 
   <!-- ================= HOME SHELL ================= -->
@@ -4194,5 +4202,12 @@ boot();
   </script>
 
 </div>
+  </div>
+</div>
+<nav class="bottom-nav" id="bottom-nav"></nav>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/liquid-glass.js"></script>
+<script>document.addEventListener('DOMContentLoaded', () => Layout.init());</script>
 </body>
 </html>

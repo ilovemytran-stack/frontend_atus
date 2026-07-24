@@ -9,9 +9,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Public">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#0B0D10">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/liquid-glass.css">
 <link rel="stylesheet" href="/css/motion-simulation.css">
 <link rel="stylesheet" href="/css/feed.css">
 <link rel="stylesheet" href="/css/chat.css">
@@ -28,15 +29,15 @@
       <div class="chat-list" id="chatListPanel">
         <div class="chat-list-header">
           <h2>Tin nhắn</h2>
-          <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+          <button class="btn btn-ghost btn-icon" id="menu-btn" aria-label="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
         </div>
         <div class="chat-search">
-          <input class="input" id="userSearchInput" placeholder="🔍 Tìm người dùng để nhắn tin..." oninput="searchUsersDebounced()">
+          <input class="input" id="userSearchInput" placeholder="Tìm người dùng để nhắn tin..." oninput="searchUsersDebounced()">
           <div id="userSearchResults" class="user-search-results"></div>
         </div>
         <div id="conversationList" class="conversation-list"></div>
         <div id="chatListEmpty" style="display:none;text-align:center;padding:48px 20px;color:var(--text-muted)">
-          <div style="font-size:40px;margin-bottom:12px">💬</div>
+          <div style="margin-bottom:12px;color:var(--electric-cyan)"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.4 8.5 8.5 0 0 1-4-1L3 20l1.1-3.4A8.5 8.5 0 1 1 21 11.5Z"/></svg></div>
           <p>Chưa có cuộc trò chuyện nào</p>
         </div>
       </div>
@@ -44,7 +45,7 @@
       <!-- Chat window -->
       <div class="chat-window" id="chatWindow">
         <div class="chat-window-empty" id="chatEmpty">
-          <div style="font-size:56px;margin-bottom:16px">💬</div>
+          <div style="margin-bottom:16px;color:var(--electric-cyan)"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.4 8.5 8.5 0 0 1-4-1L3 20l1.1-3.4A8.5 8.5 0 1 1 21 11.5Z"/></svg></div>
           <p>Chọn một cuộc trò chuyện để bắt đầu</p>
         </div>
         <div id="chatActive" style="display:none;height:100%;display:none;flex-direction:column">
@@ -59,7 +60,7 @@
           <div class="chat-messages" id="chatMessages"></div>
           <div class="chat-typing" id="chatTyping" style="display:none">đang nhập...</div>
           <div class="chat-input-bar">
-            <label class="btn btn-ghost btn-icon" for="chatImageInput">🖼</label>
+            <label class="btn btn-ghost btn-icon" for="chatImageInput" aria-label="Gửi ảnh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></label>
             <input type="file" id="chatImageInput" accept="image/*" style="display:none" onchange="sendImageMessage(event)">
             <button class="btn btn-ghost btn-icon" onclick="toggleEmojiPicker()">😊</button>
             <input class="chat-input" id="chatInput" placeholder="Nhập tin nhắn..." onkeydown="handleChatKeydown(event)" oninput="handleTyping()">
@@ -77,6 +78,7 @@
 
 <script src="/js/api.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/liquid-glass.js"></script>
 <script type="module" src="/js/motion-simulation.js"></script>
 <script src="/js/chat.js"></script>
 </body>
