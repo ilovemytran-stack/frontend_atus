@@ -60,7 +60,7 @@ class Layout {
     document.querySelector('.main-content')?.classList.add('has-glass-sidebar'); // đẩy nội dung chính ra đúng khoảng trống của sidebar nổi — làm bằng JS cho chắc, không phụ thuộc selector CSS phức tạp
     const current = location.pathname.split('/').pop();
     const navItems = [
-      { href: 'index.html', icon: Icon.home, label: 'Trang chủ' },
+      { href: 'feed.html', icon: Icon.home, label: 'Trang chủ' },
       { href: 'explore.html', icon: Icon.search, label: 'Khám phá' },
       { href: 'videos.html', icon: Icon.film, label: 'Video' },
       { href: 'game.html', icon: Icon.sword, label: 'G.Legendary', gameNew: true },
@@ -114,7 +114,7 @@ class Layout {
     nav.classList.add('glass', 'glass-bottomnav');
     const current = location.pathname.split('/').pop();
     const items = [
-      { href: 'index.html', icon: Icon.home, label: 'Home' },
+      { href: 'feed.html', icon: Icon.home, label: 'Home' },
       { href: 'explore.html', icon: Icon.search, label: 'Explore' },
       { href: 'videos.html', icon: Icon.film, label: 'Video' },
       { href: 'atelier.html', icon: Icon.atelier, label: 'Atelier' },
@@ -166,8 +166,8 @@ class Layout {
 
   // Thông báo hệ thống (popup toàn server) — CHỈ hiện ở trang chủ, không làm phiền các trang khác
   static async checkAnnouncement() {
-    const page = location.pathname.split('/').pop() || 'index.html';
-    if (page !== 'index.html' && page !== '') return;
+    const page = location.pathname.split('/').pop();
+    if (page !== 'feed.html') return; // "/" và "index.html" giờ là Welcome — không hiện thông báo đè lên phần mở đầu
     try {
       const res = await API.get('/announcements/active');
       const ann = res?.announcement;

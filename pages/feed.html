@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Public</title>
+<link rel="stylesheet" href="/css/global.css">
+<link rel="stylesheet" href="/css/liquid-glass.css">
+<link rel="stylesheet" href="/css/motion-simulation.css">
+<link rel="stylesheet" href="/css/feed.css">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Public">
+<meta name="theme-color" content="#0B0D10">
+<link rel="apple-touch-icon" href="/icon-192.png">
+</head>
+<body>
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Main -->
+  <main class="main-content">
+    <!-- Mobile header -->
+    <header class="mobile-header glass">
+      <button class="btn btn-ghost btn-icon" id="menu-btn" aria-label="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <div class="mobile-header-logo">Public</div>
+      <button class="btn btn-ghost btn-icon" onclick="location.href='explore.html'" aria-label="Tìm kiếm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+    </header>
+
+    <!-- Thanh tìm kiếm nổi (desktop) -->
+    <div class="glass-topbar glass">
+      <label class="lg-search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" placeholder="Tìm trên Public..." onkeydown="if(event.key==='Enter') location.href='explore.html?q='+encodeURIComponent(this.value)">
+      </label>
+      <button class="btn glass-btn btn-icon" onclick="location.href='notifications.html'" aria-label="Thông báo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+    </div>
+
+    <!-- Feed tabs -->
+    <div class="feed-tabs">
+      <button class="feed-tab active" data-tab="following" onclick="switchTab('following')">Đang theo dõi</button>
+      <button class="feed-tab" data-tab="explore" onclick="switchTab('explore')">Đề xuất</button>
+    </div>
+
+    <!-- Create post bar -->
+    <div class="create-post-bar card glass" id="createBar" style="display:none">
+      <img src="" class="avatar avatar-md" id="myAvatar" alt="">
+      <button class="create-post-placeholder" onclick="openCreateModal()">Bạn đang nghĩ gì vậy?</button>
+      <div class="create-post-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openCreateModal('image')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Ảnh</button>
+        <button class="btn btn-ghost btn-sm" onclick="openCreateModal('video')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg> Video</button>
+      </div>
+    </div>
+
+    <!-- Feed -->
+    <div id="feed" class="feed"></div>
+    <div id="feedLoader" class="feed-loader">
+      <div class="skeleton" style="height:200px;border-radius:16px;margin:16px"></div>
+      <div class="skeleton" style="height:200px;border-radius:16px;margin:16px"></div>
+    </div>
+    <div id="feedEnd" style="display:none;text-align:center;padding:32px;color:var(--text-muted)">Bạn đã xem hết rồi 🎉</div>
+  </main>
+
+  <!-- Right sidebar -->
+  <aside class="right-sidebar">
+    <div id="suggestedUsers"></div>
+  </aside>
+</div>
+
+<!-- Create Post Modal -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal glass glass-enter" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Tạo bài viết</div>
+      <button class="modal-close btn btn-ghost btn-icon" onclick="closeCreateModal()" aria-label="Đóng"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="modal-user">
+      <img src="" class="avatar avatar-md" id="modalAvatar" alt="">
+      <div>
+        <div id="modalUsername" style="font-weight:600"></div>
+        <select class="input" id="postPrivacy" style="padding:2px 8px;font-size:0.8rem;width:auto">
+          <option value="public">🌐 Công khai</option>
+          <option value="followers">👥 Người theo dõi</option>
+        </select>
+      </div>
+    </div>
+    <textarea class="input modal-textarea" id="postContent" placeholder="Bạn đang nghĩ gì vậy?" rows="4"></textarea>
+    <div id="imagePreviewContainer" class="image-preview-grid"></div>
+    <div class="modal-media-btns">
+      <label class="btn btn-ghost btn-sm" for="imageInput"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg> Thêm ảnh</label>
+      <input type="file" id="imageInput" accept="image/*" multiple style="display:none" onchange="handleImageSelect(event)">
+      <label class="btn btn-ghost btn-sm" for="videoInput"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg> Thêm video</label>
+      <input type="file" id="videoInput" accept="video/*" style="display:none" onchange="handleVideoSelect(event)">
+    </div>
+    <div id="videoPreviewContainer"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button class="btn btn-secondary" style="flex:1" onclick="closeCreateModal()">Hủy</button>
+      <button class="btn btn-primary" style="flex:2" id="postSubmitBtn" onclick="submitPost()">Đăng bài</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom nav -->
+<nav class="bottom-nav" id="bottom-nav"></nav>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="/js/three-orb.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/liquid-glass.js"></script>
+<script type="module" src="/js/motion-simulation.js"></script>
+<script src="/js/feed.js"></script>
+</body>
+</html>

@@ -85,7 +85,7 @@ body::before { content: ''; position: fixed; inset: 0; background: radial-gradie
 <div id="toast-container"></div>
 <script src="/js/api.js"></script>
 <script>
-if (API.isLoggedIn()) window.location.href = 'index.html';
+if (API.isLoggedIn()) window.location.href = 'feed.html';
 
 function togglePwd(id) { const el = document.getElementById(id); el.type = el.type === 'password' ? 'text' : 'password'; }
 
@@ -125,7 +125,7 @@ async function register() {
     localStorage.setItem('ss_refresh', res.refreshToken);
     API.saveUser(res.user);
     Toast.success('Đăng ký thành công! Chào mừng 🎉');
-    setTimeout(() => window.location.href = 'index.html', 800);
+    setTimeout(() => window.location.href = 'feed.html', 800);
   } else {
     Toast.error(res?.message || 'Đăng ký thất bại');
   }

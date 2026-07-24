@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('glMenuAccount').addEventListener('click', () => { window.location.href = `profile.html?u=${GL.me.username}`; });
 
   document.getElementById('glMenuExit').addEventListener('click', () => {
-    if (confirm('Thoát game và về trang chủ?')) window.location.href = 'index.html';
+    if (confirm('Thoát game và về trang chủ?')) window.location.href = 'feed.html';
   });
 });
 

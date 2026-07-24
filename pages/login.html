@@ -68,7 +68,7 @@ body::before { content: ''; position: fixed; inset: 0; background: radial-gradie
 <div id="toast-container"></div>
 <script src="/js/api.js"></script>
 <script>
-if (API.isLoggedIn()) window.location.href = 'index.html';
+if (API.isLoggedIn()) window.location.href = 'feed.html';
 
 const emailEl = document.getElementById('email');
 const pwdEl = document.getElementById('password');
@@ -92,7 +92,7 @@ async function login() {
     localStorage.setItem('ss_refresh', res.refreshToken);
     API.saveUser(res.user);
     Toast.success('Đăng nhập thành công!');
-    setTimeout(() => window.location.href = 'index.html', 500);
+    setTimeout(() => window.location.href = 'feed.html', 500);
   } else {
     Toast.error(res?.message || 'Đăng nhập thất bại');
     emailEl.classList.add('input-error');
