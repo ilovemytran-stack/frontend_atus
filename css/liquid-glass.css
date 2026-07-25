@@ -27,27 +27,30 @@
 }
 
 /* ---------- Sidebar nổi ---------- */
+/* MOBILE-FIRST (đồng bộ với global.css): mặc định — kể cả lúc .open trên
+   mobile — sidebar bám sát mép trái, full-height, không bo góc, y hệt
+   sidebar thường (không có style "nổi kính"). Style "nổi kính" thật sự
+   (cách mép 12px, bo góc, có khoảng trống cho main-content) CHỈ bật ở
+   desktop (>=769px) — nơi sidebar luôn hiện sẵn, không cần .open.
+   (Trước đây làm ngược lại — mặc định "nổi kính" rồi override lại cho
+   mobile — nên chỉ cần thiếu 1 override là margin-left/kích thước bị giữ
+   nguyên theo desktop, đúng kiểu bug khoảng trống trắng đã gặp.) */
 .glass-sidebar.sidebar {
-  top: 12px; left: 12px; height: calc(100dvh - 24px);
-  border-radius: var(--radius-xl);
+  top: 0; left: 0; height: 100dvh; border-radius: 0;
   transition: transform var(--spring);
 }
-.main-content.has-glass-sidebar { margin-left: calc(var(--sidebar-w) + 24px); }
-@media (max-width: 768px) {
-  .main-content.has-glass-sidebar { margin-left: 0; }
-  /* BUG FIX: left:12px ở trên không có override cho mobile, nên
-     transform:translateX(-100%) (kế thừa từ .sidebar trong global.css)
-     chỉ dịch đúng 100% bề rộng sidebar — để lại dải ~12px+viền của
-     sidebar lộ ra ở mép trái màn hình, đè lên nội dung chính.
-     Đặt lại left:0 (và bỏ style "nổi" khi ẩn) để sidebar trượt hẳn
-     ra ngoài màn hình như sidebar thường. */
+.glass-sidebar.sidebar.open {
+  top: 12px; left: 12px; height: calc(100dvh - 24px);
+  border-radius: var(--radius-xl);
+}
+.main-content.has-glass-sidebar { margin-left: 0; }
+
+@media (min-width: 769px) {
   .glass-sidebar.sidebar {
-    top: 0; left: 0; height: 100dvh; border-radius: 0;
-  }
-  .glass-sidebar.sidebar.open {
     top: 12px; left: 12px; height: calc(100dvh - 24px);
     border-radius: var(--radius-xl);
   }
+  .main-content.has-glass-sidebar { margin-left: calc(var(--sidebar-w) + 24px); }
 }
 
 /* ---------- Top bar kính nổi (desktop) — chứa ô tìm kiếm ---------- */

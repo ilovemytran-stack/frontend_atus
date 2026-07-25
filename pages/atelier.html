@@ -356,7 +356,15 @@ input:disabled, .chip:disabled, .mini-btn:disabled{ opacity:.35; pointer-events:
 .me-row.danger span, .me-row.danger svg{ color:var(--danger); }
 .me-row .chev{ margin-left:auto; width:13px; height:13px; color:var(--text-faint); }
 
-.bottom-nav{
+/* ĐỔI TÊN từ ".bottom-nav" -> ".atelier-tabbar": tên cũ trùng với class
+   ".bottom-nav" của thanh nav TOÀN SITE (#bottom-nav, render bởi
+   layout.js/global.css, nằm ở cuối <body>). Vì rule này định nghĩa SAU
+   global.css trong cùng trang nên nó đè mất "position:fixed; bottom:0" của
+   thanh nav toàn site — khiến thanh nav site rơi xuống cuối luồng trang
+   (phải cuộn hết mới thấy) thay vì luôn nổi cố định. Đây là tab bar RIÊNG
+   của Atelier (Chỉnh sửa/Mẫu/AI Lab/Dự án/Tôi), tách class ra để không
+   đụng nhau nữa. */
+.atelier-tabbar{
   flex:0 0 auto; display:flex; background:var(--void); border-top:1px solid var(--hairline);
   padding:9px 4px calc(9px + var(--safe-bottom));
 }
@@ -832,7 +840,7 @@ input:disabled, .chip:disabled, .mini-btn:disabled{ opacity:.35; pointer-events:
 
     </div>
 
-    <nav class="bottom-nav">
+    <nav class="atelier-tabbar">
       <button class="nav-btn active" data-page="home">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="6" r="2.1"/><circle cx="6" cy="18" r="2.1"/><line x1="7.7" y1="7.5" x2="19" y2="19"/><line x1="7.7" y1="16.5" x2="19" y2="5"/></svg>
         <span>Chỉnh sửa</span>
@@ -3451,7 +3459,7 @@ function showScreen(which){
 }
 function showHomePage(page){
   $$('.home-page').forEach(p=> p.classList.toggle('active', p.dataset.page===page));
-  $$('.bottom-nav .nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.page===page));
+  $$('.atelier-tabbar .nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.page===page));
   $('#homeScroll').scrollTop = 0;
   if(page==='projects') renderProjectsGrid();
   if(page==='templates') renderTemplatesGrid();
@@ -4045,7 +4053,7 @@ function showNextTip(){
 
 function wireApp(){
   /* bottom nav + home tiles */
-  $$('.bottom-nav .nav-btn').forEach(btn=> btn.addEventListener('click', ()=> showHomePage(btn.dataset.page)));
+  $$('.atelier-tabbar .nav-btn').forEach(btn=> btn.addEventListener('click', ()=> showHomePage(btn.dataset.page)));
   $('#newVideoTile').addEventListener('click', ()=> startNewProject('video'));
   $('#newPhotoTile').addEventListener('click', ()=> startNewProject('photo'));
   $('#promoPill').addEventListener('click', showNextTip);

@@ -37,7 +37,7 @@
   --border-focus: rgba(59,91,255,0.5);
 
   --radius-sm: 10px;
-  --radius-md: 16px;
+  --radius-md: 12px; /* mobile-first mặc định; desktop (>=769px) tăng lên 16px, xem @media (min-width:769px) phía dưới */
   --radius-lg: 24px;
   --radius-xl: 32px;
   --radius-full: 9999px;
@@ -146,12 +146,36 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .toast-error { border-left: 3px solid #FC5C5C; }
 .toast-info { border-left: 3px solid var(--brand); }
 
-/* Layout */
+/* Layout — MOBILE-FIRST: rule mặc định (không media query) là cho điện
+   thoại; desktop chỉ THÊM (không phải "ghi đè lại") ở @media (min-width).
+   Trước đây làm ngược lại (mặc định desktop rồi 2 lớp @media max-width đè
+   lên nhau ở global.css + thêm 1 lớp nữa ở liquid-glass.css cho class
+   ".has-glass-sidebar" do JS gắn thêm) — 3 lớp override chồng nhau như vậy
+   chỉ cần lệch thứ tự nạp CSS/JS một chút là main-content bị giữ nguyên
+   margin-left của sidebar (260px) dù sidebar đã ẩn ngoài màn hình, tạo ra
+   khoảng trống rỗng bên trái y hệt bề rộng sidebar — đúng bug đã gặp.
+   Mobile-first bỏ hẳn kiểu "đè lên nhau" đó: mặc định không có gì để đè. */
 .app-layout { display: flex; min-height: 100dvh; }
-.sidebar { position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100dvh; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 200; transition: transform var(--transition); }
-.sidebar-overlay.active { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; }
-.main-content { flex: 1; margin-left: var(--sidebar-w); min-height: 100dvh; }
-.right-sidebar { position: fixed; top: 0; right: 0; width: 280px; height: 100dvh; padding: 24px 16px; overflow-y: auto; }
+.sidebar {
+  position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100dvh;
+  background: var(--bg-card); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 5000; /* luôn nổi trên MỌI overlay riêng của từng trang (cao nhất trong code hiện tại là 600) */
+  transform: translateX(-100%); /* mobile: ẩn ngoài màn hình theo mặc định */
+  transition: transform var(--transition);
+}
+.sidebar.open { transform: translateX(0); box-shadow: var(--shadow-md); }
+.sidebar-overlay.active { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 4999; }
+.main-content { flex: 1; margin-left: 0; min-height: 100dvh; padding-bottom: var(--bottomnav-h); }
+.right-sidebar { display: none; }
+
+@media (min-width: 769px) {
+  .sidebar { transform: none; } /* desktop: sidebar luôn hiện, không cần .open */
+  .main-content { margin-left: var(--sidebar-w); padding-bottom: 0; }
+}
+@media (min-width: 1025px) {
+  .right-sidebar { display: block; position: fixed; top: 0; right: 0; width: 280px; height: 100dvh; padding: 24px 16px; overflow-y: auto; }
+}
 
 /* Mobile header (chuyển từ feed.css — mọi trang đều cần, không chỉ trang có feed) */
 .mobile-header { display: none; align-items: center; justify-content: space-between; padding: 12px 16px; position: sticky; top: 0; z-index: 50; background: var(--bg-card); border-bottom: 1px solid var(--border); }
@@ -178,7 +202,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .sidebar-user-handle { font-size: 0.78rem; color: var(--text-muted); }
 
 /* Bottom nav (mobile) */
-.bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: var(--bottomnav-h); background: var(--bg-card); border-top: 1px solid var(--border); z-index: 100; display: none; align-items: center; justify-content: space-around; padding-bottom: env(safe-area-inset-bottom); }
+.bottom-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: var(--bottomnav-h); background: var(--bg-card); border-top: 1px solid var(--border); z-index: 5000; align-items: center; justify-content: space-around; padding-bottom: env(safe-area-inset-bottom); }
 .bottom-nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.65rem; font-weight: 500; transition: var(--transition); flex: 1; padding: 8px 4px; margin: 4px; border-radius: var(--radius-md); position: relative; }
 .bottom-nav-item:hover, .bottom-nav-item:active { background: var(--glass-fill); }
 .bottom-nav-item.active { color: var(--electric-cyan); background: var(--glass-fill-strong); }
@@ -214,17 +238,13 @@ body { animation: fadeIn 0.25s ease; }
 .skeleton { background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-hover) 50%, var(--bg-elevated) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: var(--radius-sm); }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-/* Responsive */
-@media (max-width: 1024px) {
-  .right-sidebar { display: none; }
-  .main-content { margin-left: var(--sidebar-w); }
-}
-@media (max-width: 768px) {
-  .sidebar { transform: translateX(-100%); }
-  .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-md); }
-  .main-content { margin-left: 0; padding-bottom: var(--bottomnav-h); }
-  .bottom-nav { display: flex; }
-  :root { --radius-md: 12px; }
+/* Responsive — .sidebar/.main-content/.right-sidebar giờ đã mobile-first
+   ngay trong khối "Layout" phía trên, không cần override lại ở đây nữa
+   (đỡ 1 lớp chồng chéo dễ vỡ). Chỉ còn .bottom-nav (ẩn ở desktop, vì
+   desktop dùng sidebar đầy đủ thay cho thanh nav dưới) và --radius-md. */
+@media (min-width: 769px) {
+  .bottom-nav { display: none; }
+  :root { --radius-md: 16px; }
 }
 
 /* ===== Popup Thông Báo hệ thống (trang chủ) ===== */

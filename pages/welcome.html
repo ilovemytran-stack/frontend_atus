@@ -631,7 +631,12 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
     // login.html tự chuyển tiếp sang feed.html nếu đã đăng nhập (xem API.isLoggedIn()
     // trong login.html), nên chỉ cần trỏ về đây là đủ cho cả 2 trường hợp.
     enterHref: 'login.html',
-    dragonModelPath: 'Dragon.glb', // "Animated Dragon Three Motion Loops" by LasquetiSpice (CC-BY) — ship this file next to welcome.html on your host
+    // Đường dẫn TUYỆT ĐỐI (không phải "Dragon.glb" tương đối) — vì "/" được
+    // Render rewrite (200) sang "/pages/welcome.html" nhưng thanh URL vẫn là
+    // "/", nên đường dẫn tương đối sẽ bị phân giải thành "/Dragon.glb" (404)
+    // thay vì "/pages/Dragon.glb" (đúng). Absolute path chạy đúng ở cả 2 trường
+    // hợp: vào qua "/" lẫn vào thẳng "/pages/welcome.html".
+    dragonModelPath: '/pages/Dragon.glb', // "Animated Dragon Three Motion Loops" by LasquetiSpice (CC-BY)
     dragonOrbitDuration: 5000, // ms the dragon spends looping around the screen before starting to land
     dragonLandingDuration: 1500, // ms for the smooth glide-down from orbit into the resting/roar position
     dragonRoarAt: 7100, // ms after the intro starts when the roar SFX + camera hit fires
