@@ -1774,7 +1774,14 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
     }
 
     function start(gltf) {
-      if (!gltf) { finish(); return; }
+      if (!gltf) {
+        if (dcEl && dcTextEl) {
+          dcTextEl.textContent = 'Không tải được mô hình rồng 3D — kiểm tra lại Dragon.glb trên server.';
+          dcEl.classList.add('dc-visible');
+        }
+        setTimeout(finish, 1800);
+        return;
+      }
       try {
         setupScene(gltf);
         rafId = requestAnimationFrame(frame);

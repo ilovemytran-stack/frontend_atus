@@ -336,7 +336,7 @@ function renderBestiaryPanel() {
 
   html += '<b style="color:var(--gl-gold-2);display:block;margin-top:12px">' + GL.icon('shield') + ' Thần Hộ Vệ (mỗi lục địa 1 vị, xuất hiện ở map Boss)</b>';
   html += '<div class="gl-grid" style="grid-template-columns:1fr 1fr">';
-  GL.data.bosses.filter((b) => b.id !== 'b_chaoseraph').forEach((b) => {
+  GL.data.bosses.filter((b) => b.id !== 'b_chaoseraph' && b.id !== 'b_morphiel').forEach((b) => {
     const contId = b.continent;
     const cont = GL.data.continents.find((c) => c.id === contId);
     html += card(`/assets/game/bosses/${b.id}.png`, b.name, b.title, cont?.color);

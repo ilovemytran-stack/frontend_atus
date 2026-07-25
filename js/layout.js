@@ -88,7 +88,7 @@ class Layout {
             <span class="sidebar-icon">${i.icon}</span>
             <span class="sidebar-label">${i.label}</span>
             ${i.badge === 'notif' ? '<span class="sidebar-badge" id="notif-badge" style="display:none">0</span>' : ''}
-            ${i.vipCoinBadge ? `<span class="sidebar-badge sidebar-badge-gold" id="sidebar-vipcoin">${user?.vipCoin ?? 0}</span>` : ''}
+            ${i.vipCoinBadge ? `<span class="sidebar-badge sidebar-badge-gold" id="sidebar-vipcoin">${(user?.vipCoin ?? 0).toLocaleString('vi-VN')}</span>` : ''}
             ${i.gameNew || i.vboardNew || i.threedNew || i.motionNew || i.atelierNew || i.shopNew ? '<span class="sidebar-tag">MỚI</span>' : ''}
           </a>`).join('')}
       </nav>

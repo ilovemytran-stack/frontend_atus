@@ -35,6 +35,19 @@
 .main-content.has-glass-sidebar { margin-left: calc(var(--sidebar-w) + 24px); }
 @media (max-width: 768px) {
   .main-content.has-glass-sidebar { margin-left: 0; }
+  /* BUG FIX: left:12px ở trên không có override cho mobile, nên
+     transform:translateX(-100%) (kế thừa từ .sidebar trong global.css)
+     chỉ dịch đúng 100% bề rộng sidebar — để lại dải ~12px+viền của
+     sidebar lộ ra ở mép trái màn hình, đè lên nội dung chính.
+     Đặt lại left:0 (và bỏ style "nổi" khi ẩn) để sidebar trượt hẳn
+     ra ngoài màn hình như sidebar thường. */
+  .glass-sidebar.sidebar {
+    top: 0; left: 0; height: 100dvh; border-radius: 0;
+  }
+  .glass-sidebar.sidebar.open {
+    top: 12px; left: 12px; height: calc(100dvh - 24px);
+    border-radius: var(--radius-xl);
+  }
 }
 
 /* ---------- Top bar kính nổi (desktop) — chứa ô tìm kiếm ---------- */

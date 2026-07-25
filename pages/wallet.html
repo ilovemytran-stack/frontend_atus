@@ -129,7 +129,7 @@ function renderPackages(packages) {
       if (res?.success) {
         Toast.success(res.message);
         document.getElementById('walletBalance').textContent = res.vipCoin + ' Xu';
-        document.getElementById('sidebar-vipcoin') && (document.getElementById('sidebar-vipcoin').textContent = res.vipCoin);
+        document.getElementById('sidebar-vipcoin') && (document.getElementById('sidebar-vipcoin').textContent = Number(res.vipCoin || 0).toLocaleString('vi-VN'));
       } else {
         Toast.error(res?.message || 'Không thể đổi Xu');
       }
