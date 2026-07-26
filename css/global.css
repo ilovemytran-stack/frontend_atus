@@ -160,12 +160,17 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
   position: fixed; top: 0; left: 0; width: var(--sidebar-w); height: 100dvh;
   background: var(--bg-card); border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
-  z-index: 5000; /* luôn nổi trên MỌI overlay riêng của từng trang (cao nhất trong code hiện tại là 600) */
+  z-index: 6000; /* PHẢI cao hơn .bottom-nav (z-index 5000): trước đây 2 giá trị bằng
+  nhau (5000 = 5000), và vì #bottom-nav nằm SAU trong DOM (ngoài .app-layout, cuối
+  <body>) nên khi z-index bằng nhau, nó được vẽ ĐÈ LÊN sidebar đang mở thay vì ẩn
+  sau sidebar như mong muốn — đúng bug "mở sidebar mà thanh nav dưới vẫn nổi lên
+  trên". Nâng lên 6000 (và overlay xuống dưới 1 chút ở dòng sau) để đảm bảo
+  sidebar + lớp phủ mờ luôn nổi trên MỌI thứ, kể cả bottom-nav. */
   transform: translateX(-100%); /* mobile: ẩn ngoài màn hình theo mặc định */
   transition: transform var(--transition);
 }
 .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-md); }
-.sidebar-overlay.active { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 4999; }
+.sidebar-overlay.active { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 5999; }
 .main-content { flex: 1; margin-left: 0; min-height: 100dvh; padding-bottom: var(--bottomnav-h); }
 .right-sidebar { display: none; }
 
@@ -245,6 +250,7 @@ body { animation: fadeIn 0.25s ease; }
 @media (min-width: 769px) {
   .bottom-nav { display: none; }
   :root { --radius-md: 16px; }
+  .ai-widget { bottom: 20px; } /* desktop không có .bottom-nav nên khỏi cần né */
 }
 
 /* ===== Popup Thông Báo hệ thống (trang chủ) ===== */
@@ -262,7 +268,12 @@ body { animation: fadeIn 0.25s ease; }
 .ann-modal-actions .btn{ flex:1; justify-content:center; }
 
 /* ===== Trợ lý AI (G.Legendary Q&A) ===== */
-.ai-widget { position: fixed; right: 20px; bottom: 20px; z-index: 500; }
+/* bottom: trước là 20px cố định — trên mobile thanh .bottom-nav cũng fixed ở
+   đáy màn hình (cao var(--bottomnav-h) + safe-area-inset-bottom) nên nút tròn
+   AI bị chồng lên thanh nav (đúng hiện tượng thấy trong ảnh chụp: nút vàng đè
+   lên mục cuối của thanh nav). Đẩy lên trên thanh nav trên mobile; desktop ẩn
+   .bottom-nav nên trả lại 20px như cũ (override ở khối @media phía trên). */
+.ai-widget { position: fixed; right: 20px; bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom) + 16px); z-index: 500; }
 .ai-toggle-btn {
   width: 54px; height: 54px; border-radius: 50%; border: none; cursor: pointer;
   background: linear-gradient(135deg, #F5D061, #F5B84C); /* cùng gradient với .sidebar-tag "MỚI" */
@@ -273,6 +284,27 @@ body { animation: fadeIn 0.25s ease; }
 .ai-toggle-btn:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 10px 28px rgba(245, 184, 76, 0.5); }
 .ai-toggle-btn:active { transform: scale(0.95); }
 .ai-toggle-btn .icon-svg { width: 24px; height: 24px; }
+
+/* Nút ẩn (x nhỏ góc trên-trái nút tròn) + nút khôi phục khi đã ẩn — theo yêu
+   cầu "AI có thêm nút ẩn để đỡ vướng". Ẩn ở đây chỉ ẩn cho phiên hiện tại
+   (không lưu localStorage), giống cách aiHistory cũng chỉ giữ trong tab. */
+.ai-hide-btn {
+  position: absolute; top: -4px; left: -4px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1;
+  transition: var(--transition);
+}
+.ai-hide-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.ai-widget.minimized .ai-toggle-btn,
+.ai-widget.minimized .ai-hide-btn,
+.ai-widget.minimized .ai-panel { display: none; }
+.ai-restore-btn {
+  display: none; width: 34px; height: 34px; border-radius: 50%; border: 1px dashed var(--glass-border, var(--border));
+  background: var(--bg-elevated); color: #F5B84C; align-items: center; justify-content: center; opacity: 0.85;
+}
+.ai-restore-btn:hover { opacity: 1; }
+.ai-restore-btn .icon-svg { width: 16px; height: 16px; }
+.ai-widget.minimized .ai-restore-btn { display: flex; }
 
 .ai-panel {
   position: absolute; right: 0; bottom: 66px; width: 340px; max-width: calc(100vw - 40px);

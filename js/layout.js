@@ -141,14 +141,22 @@ class Layout {
   }
 
   static setupMobileMenu() {
-    const menuBtn = document.getElementById('menu-btn');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    if (!menuBtn || !sidebar) return;
-    menuBtn.addEventListener('click', () => {
+    if (!sidebar) return;
+    // Hỗ trợ NHIỀU nút mở sidebar trên cùng 1 trang, không chỉ #menu-btn duy
+    // nhất — cần cho Atelier: #menu-btn gốc chỉ nằm trong màn hình con "Home"
+    // của Atelier (bên trong .home-page), nên vừa rời sang editor/picker/tìm
+    // kiếm... là mất nút, không còn cách nào mở sidebar site nữa. Trang nào
+    // muốn có thêm 1 nút mở sidebar luôn tồn tại (không nằm trong 1 màn hình
+    // con hay ẩn/hiện theo state riêng) thì chỉ cần gắn class "js-open-sidebar"
+    // — không cần sửa gì thêm ở đây.
+    const openBtns = document.querySelectorAll('#menu-btn, .js-open-sidebar');
+    if (!openBtns.length) return;
+    openBtns.forEach((btn) => btn.addEventListener('click', () => {
       sidebar.classList.toggle('open');
       if (overlay) overlay.classList.toggle('active');
-    });
+    }));
     if (overlay) overlay.addEventListener('click', () => {
       sidebar.classList.remove('open');
       overlay.classList.remove('active');
@@ -216,6 +224,8 @@ class Layout {
     wrap.className = 'ai-widget';
     wrap.innerHTML = `
       <button class="ai-toggle-btn" id="aiToggleBtn" aria-label="Mở trợ lý AI">${Icon.sparkle}</button>
+      <button class="ai-hide-btn" id="aiHideBtn" aria-label="Ẩn trợ lý AI" title="Ẩn">✕</button>
+      <button class="ai-restore-btn" id="aiRestoreBtn" aria-label="Hiện trợ lý AI" title="Trợ lý AI">${Icon.sparkle}</button>
       <div class="ai-panel card" id="aiPanel" hidden>
         <div class="ai-panel-header">
           <span>${Icon.sparkle} Trợ lý G.Legendary</span>
@@ -239,6 +249,16 @@ class Layout {
     document.getElementById('aiToggleBtn').addEventListener('click', togglePanel);
     document.getElementById('aiCloseBtn').addEventListener('click', togglePanel);
     document.getElementById('aiForm').addEventListener('submit', (e) => this.handleAISubmit(e));
+
+    // Ẩn/khôi phục cả cụm widget (nút tròn + panel) — chỉ trong phiên hiện
+    // tại, không lưu localStorage (đồng bộ cách aiHistory đang làm).
+    document.getElementById('aiHideBtn').addEventListener('click', () => {
+      panel.hidden = true;
+      wrap.classList.add('minimized');
+    });
+    document.getElementById('aiRestoreBtn').addEventListener('click', () => {
+      wrap.classList.remove('minimized');
+    });
   }
 
   static appendAIBubble(role, text) {
