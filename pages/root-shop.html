@@ -10,8 +10,8 @@
 </style>
 <!-- Chỉ để render Sidebar/Bottom Nav dùng chung của site — KHÔNG đụng gì tới
      giao diện riêng của Root Shop ở trên. -->
-<link rel="stylesheet" href="/css/global.css">
-<link rel="stylesheet" href="/css/liquid-glass.css">
+<link rel="stylesheet" href="/css/global.css?v=20260726">
+<link rel="stylesheet" href="/css/liquid-glass.css?v=20260726">
 </head>
 <body>
 <div class="app-layout">
@@ -169,6 +169,20 @@ const CUSTOM_CSS = `
 
 @media (prefers-reduced-motion: reduce) {
   .card-reveal, .modal-pop, .typewriter, .blink-cursor { animation: none !important; }
+}
+
+/* Narrow phones (~≤420px, e.g. many Android devices at 360-400px): the
+   header row (menu + logo + search + wallet + settings + cart) was tight
+   enough that the search box got squeezed almost to nothing once every
+   other element claimed its minimum width. Tightening gaps/padding here
+   (rather than touching the component markup) gives the search input
+   enough room to stay usable without changing anything above ~420px. */
+@media (max-width: 420px) {
+  .rootshop header .flex.items-center.gap-3.px-4 { gap: 6px; padding-left: 10px; padding-right: 10px; }
+  .rootshop header .flex.items-center.gap-2.font-bold { gap: 4px; }
+  .rootshop header button[aria-label="Ví tiền"] { padding-left: 7px; padding-right: 7px; font-size: 10px; gap: 3px; }
+  .rootshop header button[aria-label="Chế độ quản lý"],
+  .rootshop header button[aria-label="Mở giỏ hàng"] { padding: 8px; }
 }
 `;
 const formatVND = (amount) => amount.toLocaleString('vi-VN') + '₫';
@@ -2319,9 +2333,9 @@ const __root = createRoot(document.getElementById('root'));
 __root.render(React.createElement(RootShop));
 
 </script>
-<script src="/js/api.js"></script>
-<script src="/js/layout.js"></script>
-<script src="/js/liquid-glass.js"></script>
+<script src="/js/api.js?v=20260726"></script>
+<script src="/js/layout.js?v=20260726"></script>
+<script src="/js/liquid-glass.js?v=20260726"></script>
 <script>document.addEventListener('DOMContentLoaded', () => Layout.init());</script>
 </body>
 </html>

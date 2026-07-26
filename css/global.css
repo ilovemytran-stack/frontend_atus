@@ -160,8 +160,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 
 /* Cards */
 .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
-.card-hover:hover { border-color: var(--border-focus); background: var(--bg-elevated); }
 .theme-light .card { box-shadow: var(--shadow-sm); } /* bg-card gần bằng bg-base trên nền sáng nên cần shadow để "nổi" lên, khác bản tối vốn đã tương phản đủ giữa 2 màu */
+.card-hover:hover { border-color: var(--border-focus); background: var(--bg-elevated); }
 
 /* Inputs */
 .input-group { display: flex; flex-direction: column; gap: 6px; }
@@ -357,27 +357,6 @@ body { animation: fadeIn 0.25s ease; }
 .ai-toggle-btn:active { transform: scale(0.95); }
 .ai-toggle-btn .icon-svg { width: 24px; height: 24px; }
 
-/* Nút ẩn (x nhỏ góc trên-trái nút tròn) + nút khôi phục khi đã ẩn — theo yêu
-   cầu "AI có thêm nút ẩn để đỡ vướng". Ẩn ở đây chỉ ẩn cho phiên hiện tại
-   (không lưu localStorage), giống cách aiHistory cũng chỉ giữ trong tab. */
-.ai-hide-btn {
-  position: absolute; top: -4px; left: -4px; width: 20px; height: 20px; border-radius: 50%;
-  background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary);
-  display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1;
-  transition: var(--transition);
-}
-.ai-hide-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
-.ai-widget.minimized .ai-toggle-btn,
-.ai-widget.minimized .ai-hide-btn,
-.ai-widget.minimized .ai-panel { display: none; }
-.ai-restore-btn {
-  display: none; width: 34px; height: 34px; border-radius: 50%; border: 1px dashed var(--glass-border, var(--border));
-  background: var(--bg-elevated); color: #F5B84C; align-items: center; justify-content: center; opacity: 0.85;
-}
-.ai-restore-btn:hover { opacity: 1; }
-.ai-restore-btn .icon-svg { width: 16px; height: 16px; }
-.ai-widget.minimized .ai-restore-btn { display: flex; }
-
 .ai-panel {
   position: absolute; right: 0; bottom: 66px; width: 340px; max-width: calc(100vw - 40px);
   height: 460px; max-height: 70vh; display: flex; flex-direction: column; overflow: hidden;
@@ -401,3 +380,24 @@ body { animation: fadeIn 0.25s ease; }
 @media (max-width: 480px) {
   .ai-panel { width: calc(100vw - 24px); right: -6px; }
 }
+
+/* Nút ẩn (x nhỏ góc trên-trái nút tròn) + nút khôi phục khi đã ẩn — theo yêu
+   cầu "AI có thêm nút ẩn để đỡ vướng". Ẩn ở đây chỉ ẩn cho phiên hiện tại
+   (không lưu localStorage), giống cách aiHistory cũng chỉ giữ trong tab. */
+.ai-hide-btn {
+  position: absolute; top: -4px; left: -4px; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1;
+  transition: var(--transition);
+}
+.ai-hide-btn:hover { color: var(--text-primary); background: var(--bg-hover); }
+.ai-widget.minimized .ai-toggle-btn,
+.ai-widget.minimized .ai-hide-btn,
+.ai-widget.minimized .ai-panel { display: none; }
+.ai-restore-btn {
+  display: none; width: 34px; height: 34px; border-radius: 50%; border: 1px dashed var(--glass-border, var(--border));
+  background: var(--bg-elevated); color: #F5B84C; align-items: center; justify-content: center; opacity: 0.85;
+}
+.ai-restore-btn:hover { opacity: 1; }
+.ai-restore-btn .icon-svg { width: 16px; height: 16px; }
+.ai-widget.minimized .ai-restore-btn { display: flex; }

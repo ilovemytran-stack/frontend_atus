@@ -192,6 +192,27 @@ body::before {
   overflow: hidden;
 }
 
+/* Skip hint: sits below the terminal command bar during the dragon intro.
+   Independent of .dragon-caption's own visibility (that box only fades in
+   once the caption starts typing), so it fades in on its own 3s timer and
+   stays reachable the whole time the dragon sequence is skippable. */
+.dragon-skip-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 4vh;
+  transform: translateX(-50%);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+  z-index: 3;
+}
+.dragon-skip-hint.skip-hint-visible { opacity: 1; }
+
 .boot-screen {
   position: fixed;
   inset: 0;
@@ -510,20 +531,83 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
 .kb-wide { min-width: 52px; }
 .kb-space { min-width: 220px; }
 
+/* ---- Responsive: PUBLIC keeps its 3-column HUD on desktop (system panel /
+   hero / activity log, plus the physical keyboard strip along the bottom).
+   Below 900px there isn't room for that side-by-side layout, so the panels
+   drop out of the row and re-stack under the hero instead of just vanishing
+   — same system-status content, rearranged for a narrower frame. The
+   on-screen keyboard stays hidden on touch sizes since it visualizes a
+   physical keyboard that mobile visitors aren't using. ---- */
 @media (max-width: 900px) {
   .app {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-    grid-template-areas: "topbar" "hero";
-    padding: 16px;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "topbar topbar"
+      "hero hero"
+      "left right";
+    height: auto;
+    min-height: 100vh;
+    padding: 18px 20px;
+    gap: 16px;
   }
-  .panel-left, .panel-right, .keyboard { display: none; }
+  .keyboard { display: none; }
   html, body { overflow-y: auto; }
+  .panel { padding: 12px 14px; }
+  .panel-right { max-height: 210px; }
+  .log-feed { max-height: 145px; overflow-y: auto; }
   .boot-screen { padding: 8vh 7vw; }
   .boot-log { font-size: 12px; }
   .dragon-caption { bottom: 6vh; }
   .dc-header { padding: 8px 12px; }
   .dc-body { padding: 16px 12px 20px; }
+}
+
+/* Phone: the two-column status row is too cramped — stack panels full width. */
+@media (max-width: 640px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas:
+      "topbar"
+      "hero"
+      "left"
+      "right";
+    padding: 16px;
+    gap: 12px;
+  }
+  .topbar { flex-wrap: wrap; row-gap: 8px; }
+  .topbar-left, .topbar-right { gap: 10px; }
+  .hero { gap: 16px; }
+  .logo { letter-spacing: 0.07em; }
+  .enter-btn { padding: 13px 26px; font-size: 13px; }
+  .panel-right { max-height: 170px; }
+  .log-feed { max-height: 105px; }
+}
+
+/* Small phones: trim padding/type further so nothing clips or overflows. */
+@media (max-width: 380px) {
+  .app { padding: 14px; gap: 10px; }
+  .topbar { font-size: 10.5px; }
+  .clock { font-size: 12px; }
+  .chip { padding: 5px 8px; font-size: 10px; }
+  .theme-picker { font-size: 10px; }
+  .tagline { font-size: 10.5px; letter-spacing: 0.26em; }
+  .enter-btn { padding: 12px 22px; letter-spacing: 0.16em; }
+  .hint { font-size: 10px; }
+  .panel { padding: 10px 12px; }
+  .panel h3 { font-size: 10px; margin-bottom: 10px; }
+  .stat span:first-child { width: 26px; }
+}
+
+/* Short landscape phones: vertical room is scarcer than horizontal room, so
+   trade the side panels for space instead of forcing a tall scroll. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .app { padding: 10px 18px; gap: 8px; }
+  .hero { gap: 10px; }
+  .geo-globe-wrap { width: min(30vh, 150px); }
+  .logo { font-size: clamp(1.6rem, 6vw, 3rem); }
+  .panel-left, .panel-right { display: none; }
 }
 </style>
 </head>
@@ -553,6 +637,7 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
       <div class="dc-body"><span id="dcText"></span><span class="cursor-blink">_</span></div>
     </div>
   </div>
+  <div class="dragon-skip-hint" id="dragonSkipHint">touch to skip</div>
 </div>
 
 <div class="boot-screen" id="bootScreen">
@@ -708,7 +793,7 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
       }
       appendLine(lines[i]);
       fill.style.width = Math.round(((i + 1) / lines.length) * 100) + '%';
-      if (lines[i] === 'ALL SYSTEMS NOMINAL') {
+      if (lines[i] === 'ALL SYSTEMS : ACTIVE') {
         playBeep(660, 0.05);
         setTimeout(function () { playBeep(880, 0.07); }, 70);
       } else if (lines[i] !== '') {
@@ -1413,6 +1498,10 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
     var flapTimer = null;
     var flapStartPerf = null;
 
+    var skipHintEl = document.getElementById('dragonSkipHint');
+    var skipHintTimer = null;
+    var skipHandler = null;
+
     var ROAR_AT = CONFIG.dragonRoarAt / 1000;
     var DECAY_START = ROAR_AT + CONFIG.dragonDecayDelay / 1000;
     var DECAY_DURATION = CONFIG.dragonDecayDuration / 1000;
@@ -1728,6 +1817,13 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
       if (resizeHandler) window.removeEventListener('resize', resizeHandler);
       if (captionTimer) clearTimeout(captionTimer);
       if (flapTimer) clearTimeout(flapTimer);
+      if (skipHintTimer) clearTimeout(skipHintTimer);
+      if (skipHandler) {
+        overlay.removeEventListener('click', skipHandler);
+        overlay.removeEventListener('touchstart', skipHandler);
+        skipHandler = null;
+      }
+      if (skipHintEl) skipHintEl.classList.remove('skip-hint-visible');
       if (dcEl) dcEl.classList.remove('dc-visible');
       if (dcTextEl) dcTextEl.textContent = '';
       overlay.classList.remove('dragon-visible');
@@ -1800,6 +1896,19 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
     try {
       overlay.style.pointerEvents = 'auto';
       requestAnimationFrame(function () { overlay.classList.add('dragon-visible'); });
+
+      // "touch to skip" fades in 3s into the dragon sequence and lets the
+      // visitor tap/click straight through to the terminal-command split
+      // transition instead of waiting out the full orbit/roar/decay.
+      skipHintTimer = setTimeout(function () {
+        if (!finished && skipHintEl) skipHintEl.classList.add('skip-hint-visible');
+      }, 3000);
+      skipHandler = function (ev) {
+        ev.preventDefault();
+        finish();
+      };
+      overlay.addEventListener('click', skipHandler);
+      overlay.addEventListener('touchstart', skipHandler, { passive: false });
 
       if (dragonGltf) {
         start(dragonGltf);
@@ -1904,11 +2013,24 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
       for (var i = 0; i < withIds.length; i++) withIds[i].removeAttribute('id');
     }
 
+    // innerHTML cloning copies markup/CSS but not canvas pixel content, so
+    // every <canvas> (matrix rain, globes, dragon) would otherwise come out
+    // blank in the snapshot. Paint each clone with its live source canvas's
+    // current frame so the two halves actually show what's on screen.
+    function copyCanvasPixels(cloneRoot) {
+      var live = document.body.querySelectorAll('canvas');
+      var cloned = cloneRoot.querySelectorAll('canvas');
+      for (var i = 0; i < live.length && i < cloned.length; i++) {
+        try { cloned[i].getContext('2d').drawImage(live[i], 0, 0); } catch (err) {}
+      }
+    }
+
     var top = document.createElement('div');
     top.className = 'cross-cut-half cross-cut-top';
     var topInner = document.createElement('div');
     topInner.className = 'cross-cut-inner';
     topInner.innerHTML = document.body.innerHTML;
+    copyCanvasPixels(topInner);
     stripIds(topInner);
     top.appendChild(topInner);
 
@@ -1917,6 +2039,7 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
     var bottomInner = document.createElement('div');
     bottomInner.className = 'cross-cut-inner';
     bottomInner.innerHTML = document.body.innerHTML;
+    copyCanvasPixels(bottomInner);
     stripIds(bottomInner);
     bottom.appendChild(bottomInner);
 
@@ -1957,6 +2080,10 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
     app.classList.add('app-exit');
     playBeep(600, 0.08);
     setTimeout(function () {
+      // The split-screen (cross-cut) transition now fires the instant the
+      // dragon interface's terminal-command sequence finishes (whether it
+      // plays out in full or is tapped/clicked through via "touch to skip"),
+      // rather than as a separate step after the app view is restored.
       playDragonIntro(function onRevealed() {
         app.classList.remove('app-exit');
         appReady = true;
@@ -1967,7 +2094,7 @@ kbd { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; fon
               window.location.href = CONFIG.enterHref;
             }
           });
-        }, 900);
+        }, 150);
       });
     }, 650);
   }

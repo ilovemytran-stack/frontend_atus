@@ -73,7 +73,7 @@ class Layout {
       { href: 'messages.html', icon: Icon.message, label: 'Tin nhắn', badge: 'msg' },
       { href: 'notifications.html', icon: Icon.bell, label: 'Thông báo', badge: 'notif' },
       { href: user ? `profile.html?u=${user.username}` : 'login.html', icon: Icon.user, label: 'Trang cá nhân' },
-    ];
+    ].filter(i => !(i.motionNew && (current === '3d.html' || current === 'vboard.html'))); // 2 trang này đã tự có camera+nhận diện tay riêng (threed.js/vboard.js) — bật thêm lớp "Mô phỏng chuyển động" chung sẽ chạy 2 pipeline MediaPipe cùng lúc, tranh camera và chồng cử chỉ (vd: đang xoay thiên hà bằng tay lại vô tình bị tính là "nắm tay" -> tự đăng xuất)
     if (user?.role === 'admin' || user?.role === 'moderator') {
       navItems.push({ href: 'admin.html', icon: Icon.admin, label: user.role === 'admin' ? 'Quản trị' : 'Điều hành' });
     }

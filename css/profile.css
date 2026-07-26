@@ -3,9 +3,21 @@
 .profile-cover img { width: 100%; height: 100%; object-fit: cover; }
 .profile-cover-edit { position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.5); color: #fff; padding: 6px 12px; border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 600; }
 
-.profile-header { display: flex; align-items: flex-end; justify-content: space-between; padding: 0 20px; margin-top: -48px; position: relative; max-width: 640px; margin-left: auto; margin-right: auto; }
+.profile-header { display: flex; align-items: flex-end; justify-content: space-between; padding: 0 20px; margin-top: -48px; position: relative; max-width: 640px; margin-left: auto; margin-right: auto; flex-wrap: wrap; row-gap: 10px; }
 .profile-avatar { border: 4px solid var(--bg-base); cursor: pointer; }
 .profile-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+
+/* On someone else's profile, .profile-actions holds 2 buttons (Follow +
+   Message) instead of the 1 short "Edit" button on your own profile. Those
+   2 buttons use .btn's white-space:nowrap + 10px/20px padding, so on narrow
+   phones (~375px and below) their combined min-width didn't leave room next
+   to the 128px avatar — body has overflow-x:hidden, so the overflow wasn't
+   a scrollbar, it silently clipped the Message button off-screen. flex-wrap
+   above lets the row drop to a second line instead of clipping; the tighter
+   padding here makes that fallback less likely to trigger in the first place. */
+@media (max-width: 480px) {
+  .profile-actions .btn { padding: 8px 14px; font-size: 0.82rem; }
+}
 
 .profile-info { padding: 12px 20px 0; max-width: 640px; margin: 0 auto; }
 .profile-name { font-size: 1.3rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
