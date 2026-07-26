@@ -55,6 +55,73 @@
   --font-display: 'Manrope', 'Inter', sans-serif;
 }
 
+/* ===== LIGHT THEME (đợt redesign theo ảnh mẫu "liquid glass" sáng màu) =====
+   Đây là bộ token THAY THẾ, KHÔNG sửa vào :root gốc ở trên — lý do: .sidebar/
+   .bottom-nav dùng chung y hệt bởi layout.js trên MỌI trang, kể cả Atelier/
+   Root Shop/G.Legendary (3 trang yêu cầu giữ nguyên). Nếu sửa thẳng :root,
+   sidebar/nav ở 3 trang đó cũng đổi màu theo dù không đụng vào file của
+   chúng — sai yêu cầu. Cách làm: trang nào muốn theo giao diện mới thì thêm
+   class "theme-light" vào <html> (hoặc <body>), lúc đó các biến bên dưới ghi
+   đè lên giá trị gốc TRONG PHẠM VI trang đó thôi; trang không có class này
+   (Atelier/Root Shop/Game, và mọi trang chưa redesign) giữ nguyên bộ tối như
+   cũ, không suy suyển. Toàn bộ UI hiện tại (feed.css, .btn-*, .card, .glass-*
+   ...) đã đọc màu qua var(--...) chứ không hardcode, nên chỉ cần đổi token là
+   giao diện tự đổi theo, không phải sửa từng dòng CSS component. */
+.theme-light {
+  --bg-base: #F1F0FA;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #F6F5FC;
+  --bg-hover: #ECEAF8;
+  --bg-glass: rgba(255,255,255,0.6);
+
+  --electric-cyan: #0EA5B7;
+  --royal-blue: #6D5FF3;
+  --violet: #A480F5;
+
+  --glass-fill: rgba(255,255,255,0.55);
+  --glass-fill-strong: rgba(255,255,255,0.78);
+  --glass-border: rgba(120,110,200,0.16);
+
+  --brand: var(--royal-blue);
+  --brand-hover: #5747E0;
+  --brand-glow: rgba(109,95,243,0.28);
+  --accent-pink: #E8397F;
+  --accent-cyan: var(--electric-cyan);
+  --accent-green: #0FA968;
+  --danger: #E5484D;
+
+  --text-primary: #1B1B2E;
+  --text-secondary: #61627A;
+  --text-muted: #9698AC;
+  --text-link: var(--royal-blue);
+
+  --border: rgba(27,27,46,0.09);
+  --border-focus: rgba(109,95,243,0.5);
+
+  --shadow-sm: 0 2px 10px rgba(43,38,110,0.07);
+  --shadow-md: 0 10px 30px rgba(43,38,110,0.10);
+  --shadow-brand: 0 0 26px rgba(109,95,243,0.22);
+  --shadow-glass: 0 10px 40px rgba(43,38,110,0.12), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+/* Nền tổng thể kiểu ảnh mẫu: mấy khối màu mờ lớn (blob) loang nhẹ phía sau
+   toàn bộ nội dung. Làm bằng nhiều lớp background TRÊN CHÍNH body (không
+   dùng pseudo-element position:fixed riêng) — lý do: 1 pseudo-element
+   position:fixed với z-index:0 sẽ vẽ ĐÈ LÊN các phần tử static bình thường
+   (vd .post-card không set position) theo đúng quy tắc stacking của CSS,
+   tức là blob sẽ nổi lên trên nội dung thay vì nằm sau nó. Gộp gradient vào
+   ngay background của body thì luôn nằm dưới mọi nội dung con của body,
+   không cần tính z-index gì thêm. Không set background-attachment:fixed vì
+   Safari iOS xử lý thuộc tính này không ổn định/hay giật khi cuộn.
+   .theme-light .app-layout ...z-index:1 vẫn giữ lại phòng khi có trang dùng
+   layout khác main-content/mobile-header/glass-topbar mà cần tách lớp. */
+.theme-light body, body.theme-light {
+  background:
+    radial-gradient(560px circle at 8% 8%, rgba(109,95,243,0.16), transparent 60%),
+    radial-gradient(620px circle at 96% 18%, rgba(164,128,245,0.14), transparent 60%),
+    radial-gradient(680px circle at 30% 96%, rgba(14,165,183,0.10), transparent 60%),
+    var(--bg-base);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 16px; -webkit-text-size-adjust: 100%; }
 body { font-family: 'Inter', sans-serif; background: var(--bg-base); color: var(--text-primary); line-height: 1.5; overflow-x: hidden; }
@@ -75,6 +142,8 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; border-radius: var(--radius-full); font-weight: 600; font-size: 0.9rem; transition: var(--transition); white-space: nowrap; }
 .btn-primary { background: var(--brand); color: #fff; }
 .btn-primary:hover { background: var(--brand-hover); box-shadow: var(--shadow-brand); transform: translateY(-1px); }
+.theme-light .btn-primary { background: linear-gradient(135deg, var(--royal-blue), var(--violet)); }
+.theme-light .btn-primary:hover { background: linear-gradient(135deg, var(--brand-hover), var(--violet)); }
 .btn-secondary { background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--bg-hover); }
 .btn-ghost { color: var(--text-secondary); }
@@ -92,6 +161,7 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* Cards */
 .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .card-hover:hover { border-color: var(--border-focus); background: var(--bg-elevated); }
+.theme-light .card { box-shadow: var(--shadow-sm); } /* bg-card gần bằng bg-base trên nền sáng nên cần shadow để "nổi" lên, khác bản tối vốn đã tương phản đủ giữa 2 màu */
 
 /* Inputs */
 .input-group { display: flex; flex-direction: column; gap: 6px; }
@@ -185,12 +255,14 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); }
 /* Mobile header (chuyển từ feed.css — mọi trang đều cần, không chỉ trang có feed) */
 .mobile-header { display: none; align-items: center; justify-content: space-between; padding: 12px 16px; position: sticky; top: 0; z-index: 50; background: var(--bg-card); border-bottom: 1px solid var(--border); }
 .mobile-header-logo { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; background: linear-gradient(135deg, #fff, var(--electric-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.theme-light .mobile-header-logo { background: linear-gradient(135deg, var(--royal-blue), var(--violet)); -webkit-background-clip: text; }
 @media (max-width: 768px) { .mobile-header { display: flex; } }
 
 /* Sidebar content (chuyển từ feed.css — mọi trang đều cần, không chỉ trang có feed) */
 .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 20px 16px 12px; }
 .sidebar-logo-icon { font-size: 24px; }
 .sidebar-logo-text { font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; background: linear-gradient(135deg, #fff, var(--electric-cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.theme-light .sidebar-logo-text { background: linear-gradient(135deg, var(--royal-blue), var(--violet)); -webkit-background-clip: text; }
 .sidebar-nav { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
 .sidebar-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; transition: var(--transition); position: relative; background: transparent; border: 1px solid transparent; }
 .sidebar-item:hover { background: var(--glass-fill, var(--bg-elevated)); color: var(--text-primary); border-color: var(--glass-border, transparent); }
