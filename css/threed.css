@@ -1,0 +1,249 @@
+/* ===== 3D (Gesture Galaxy + VBoard) — trang toàn màn hình ===== */
+
+:root {
+    --gg-panel-bg: rgba(10, 10, 16, 0.72);
+    --gg-panel-border: rgba(255, 255, 255, 0.1);
+    --gg-galaxy-1: #4338CA;
+    --gg-galaxy-2: #14B8A6;
+    --gg-draw-1: #E11D48;
+    --gg-draw-2: #F97316;
+}
+
+body {
+    background: #000;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+canvas { display: block; }
+
+/* ---------- Full-screen layers ---------- */
+#three-canvas, #webcam, #draw-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+#three-canvas { z-index: 0; }
+#webcam {
+    z-index: 0;
+    object-fit: cover;
+    transform: scaleX(-1);
+    display: none;
+}
+#draw-canvas {
+    z-index: 1;
+    display: none;
+    touch-action: none;
+}
+
+/* ---------- Force the shared sidebar into always-toggle mode -----------
+   global.css only slides .sidebar off-canvas under max-width:768px; on this
+   immersive page we want it off-canvas (and opened only via #menu-btn) at
+   every viewport size, so we redeclare the same rules unconditionally. */
+.sidebar { transform: translateX(-100%); }
+.sidebar.open { transform: translateX(0); box-shadow: var(--shadow-md); }
+
+/* ---------- Control panels ---------- */
+.mode-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: var(--gg-panel-bg);
+    backdrop-filter: blur(15px);
+    padding: 20px;
+    border-radius: 15px;
+    color: white;
+    border: 1px solid var(--gg-panel-border);
+    z-index: 100;
+    width: 220px;
+    max-width: calc(100vw - 40px);
+}
+#draw-panel { display: none; }
+
+.mode-panel .control-group { margin-bottom: 15px; }
+.mode-panel .control-group:last-child { margin-bottom: 0; }
+.mode-panel label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; opacity: 0.7; }
+
+.mode-panel select,
+.mode-panel input[type="color"],
+.mode-panel button {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.mode-panel button:hover { background: rgba(255, 255, 255, 0.2); }
+
+.status-badge {
+    font-size: 0.7rem;
+    margin-top: 4px;
+    padding: 5px;
+    text-align: center;
+    border-radius: 4px;
+    background: rgba(0, 255, 150, 0.1);
+    color: #00ffaa;
+}
+
+/* ---------- Draw panel extras ---------- */
+.swatch-row { display: flex; gap: 8px; }
+.swatch {
+    width: 30px; height: 30px; padding: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+}
+.swatch.active {
+    border-color: #fff;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+    transform: scale(1.08);
+}
+
+.stepper {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 4px 6px;
+}
+.stepper span { font-weight: 700; font-variant-numeric: tabular-nums; }
+.step-btn {
+    width: 32px; height: 32px; padding: 0;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.btn-row { display: flex; gap: 8px; }
+.btn-row button { flex: 1; font-size: 0.75rem; padding: 10px 6px; }
+#clear-btn { background: rgba(225, 29, 72, 0.15); border: 1px solid rgba(225, 29, 72, 0.4); color: #ff9db0; }
+#clear-btn:hover { background: rgba(225, 29, 72, 0.28); }
+#save-btn { background: rgba(249, 115, 22, 0.15); border: 1px solid rgba(249, 115, 22, 0.4); color: #ffc38a; }
+#save-btn:hover { background: rgba(249, 115, 22, 0.28); }
+
+.signature {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Dancing Script', cursive;
+    font-size: 1.4rem;
+    pointer-events: none;
+    z-index: 100;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Bottom cluster: menu (back to site) + mode switcher ---------- */
+#bottom-cluster {
+    position: fixed;
+    left: 50%;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 140;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.menu-fab {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--brand, #7C5CFC);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 22px rgba(124, 92, 252, 0.45);
+    flex-shrink: 0;
+}
+.menu-fab:active { transform: scale(0.94); }
+.menu-fab svg { width: 22px; height: 22px; }
+
+#mode-switcher {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(10, 10, 16, 0.6);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--gg-panel-border);
+    border-radius: 999px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+.mode-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 22px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    background: transparent;
+    transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    white-space: nowrap;
+}
+.mode-icon { font-size: 1.25rem; }
+.mode-btn[data-mode="particles"].active {
+    background: linear-gradient(135deg, var(--gg-galaxy-1), var(--gg-galaxy-2));
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+    transform: scale(1.06);
+}
+.mode-btn[data-mode="draw"].active {
+    background: linear-gradient(135deg, var(--gg-draw-1), var(--gg-draw-2));
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
+    transform: scale(1.06);
+}
+
+/* ---------- Camera permission gate ---------- */
+#start-overlay {
+    position: fixed; inset: 0; z-index: 999;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 38%, rgba(67, 56, 202, 0.25), rgba(0, 0, 0, 0.6) 78%);
+    padding: 24px;
+}
+#start-card {
+    max-width: 340px;
+    width: 100%;
+    background: var(--gg-panel-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--gg-panel-border);
+    border-radius: 20px;
+    padding: 32px 26px;
+    color: #fff;
+    text-align: center;
+}
+#start-card h1 { font-size: 1.4rem; margin: 0 0 12px; font-weight: 800; }
+#start-card p { font-size: 0.85rem; line-height: 1.55; opacity: 0.75; margin: 0 0 22px; }
+#start-btn {
+    width: 100%;
+    background: #fff; color: #0a0a0a; font-weight: 800; font-size: 0.95rem;
+    padding: 14px; border-radius: 12px;
+}
+#start-btn:hover { background: #f0f0f0; }
+#start-btn:disabled { opacity: 0.6; cursor: default; }
+.start-error { color: #ff9db0; font-size: 0.8rem; margin: 14px 0 0; min-height: 1em; }
+
+/* ---------- Reveal chrome once camera is granted (menu FAB stays put) ---------- */
+body.gating #ui-panel,
+body.gating #mode-switcher,
+body.gating .signature {
+    opacity: 0;
+    pointer-events: none;
+}
+#ui-panel, #mode-switcher, .signature { transition: opacity 0.4s ease; }
+
+button:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mode-btn, #ui-panel, #mode-switcher, .signature { transition: none; }
+}
+
+@media (max-width: 380px) {
+    .mode-panel { width: 190px; padding: 16px; }
+    .mode-btn { padding: 12px 16px; font-size: 0.85rem; }
+    .menu-fab { width: 46px; height: 46px; }
+}

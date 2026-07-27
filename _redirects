@@ -1,0 +1,7 @@
+# Render Static Site rewrite rules (cú pháp kiểu Netlify _redirects).
+# SỬA LẠI: đặt file này ở gốc thư mục frontend/ (không phải frontend/pages/)
+# vì các trang tự tham chiếu CSS/JS bằng đường dẫn tuyệt đối "/css/..","/js/.."
+# — nghĩa là "frontend/" mới là Publish Directory thật, còn các trang nằm ở
+# "/pages/*.html". Rule dưới trỏ đúng theo đó.
+# "200" = REWRITE (giữ nguyên URL "/", chỉ đổi nội dung trả về).
+/  /pages/welcome.html  200

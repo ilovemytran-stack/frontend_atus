@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="refresh" content="0; url=/pages/welcome.html" />
+<title>PUBLIC // System Access</title>
+<!--
+  index.html KHÔNG còn là bản sao riêng của màn hình chào (rồng 3D) nữa.
+
+  Lý do: trước đây file này chứa TOÀN BỘ code của welcome.html được copy
+  nguyên khối sang đây (2 file gần như giống hệt nhau, ~2100 dòng mỗi file).
+  Đây chính là kiểu "welcome gọi sang index" gây rối: hai bản sao độc lập,
+  sửa 1 bên rất dễ quên sửa bên kia -> lệch nhau -> bug khó hiểu (đúng như
+  bug con rồng/text đã gặp).
+
+  welcome.html mới là bản DUY NHẤT còn được dùng thật:
+  - "/" đã được frontend/_redirects rewrite thẳng sang /pages/welcome.html
+  - Không có route/route nào khác trỏ tới index.html trong toàn bộ code
+
+  Vậy nên bây giờ index.html chỉ là 1 trang chuyển tiếp mỏng, phòng trường
+  hợp có link/bookmark cũ nào đó vẫn trỏ tới /pages/index.html trực tiếp —
+  để không bị 404, nhưng không phải bảo trì 2 bản sao của cùng 1 tính năng
+  nữa. Toàn bộ cinematic con rồng (Dragon.glb), hiệu ứng chữ gõ, boot
+  sequence... chỉ còn sống ở welcome.html.
+-->
+<script>window.location.replace('/pages/welcome.html');</script>
+</head>
+<body>
+<p style="font-family:monospace;color:#d7fbff;background:#060a10;padding:24px">
+  Đang chuyển tới trang chào... Nếu không tự chuyển, <a href="/pages/welcome.html" style="color:#0abdc6">bấm vào đây</a>.
+</p>
+</body>
+</html>
