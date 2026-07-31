@@ -84,24 +84,24 @@ function renderPost(post, index = 0) {
       <div class="post-header-info">
         <div class="post-author">
           <a href="profile.html?u=${post.author.username}">${post.author.displayName || post.author.username}</a>
-          ${post.author.isVerified ? '<span title="Đã xác minh">✅</span>' : ''}
+          ${post.author.isVerified ? `<span title="Đã xác minh">${Icon.check}</span>` : ''}
         </div>
         <div class="post-meta">${timeAgo(post.createdAt)}</div>
       </div>
-      ${user?._id === post.author._id ? `<button class="btn btn-ghost btn-icon post-more-btn" onclick="deletePost('${post._id}')">🗑</button>` : ''}
+      ${user?._id === post.author._id ? `<button class="btn btn-ghost btn-icon post-more-btn" onclick="deletePost('${post._id}')">${Icon.trash}</button>` : ''}
     </div>
     ${post.content ? `<div class="post-content ${!post.images?.length && !post.video ? (post.content.length < 120 ? 'large' : '') : ''}">${escapeHTML(post.content)}</div>` : ''}
     ${renderPostMedia(post)}
     <div class="post-actions">
       <button class="post-action-btn ${isLiked ? 'liked' : ''}" id="like-${post._id}" onclick="likePost('${post._id}', this)">
-        <span class="like-icon">${isLiked ? '❤️' : '🤍'}</span>
+        <span class="like-icon">${isLiked ? Icon.heartFilled : Icon.heart}</span>
         <span id="likes-${post._id}">${formatNum(post.likesCount)}</span>
       </button>
       <button class="post-action-btn" onclick="toggleComments('${post._id}')">
-        💬 <span>${formatNum(post.commentsCount)}</span>
+        ${Icon.message} <span>${formatNum(post.commentsCount)}</span>
       </button>
       <button class="post-action-btn" onclick="sharePost('${post._id}')">
-        🔗 <span>${formatNum(post.sharesCount)}</span>
+        ${Icon.link} <span>${formatNum(post.sharesCount)}</span>
       </button>
     </div>
     <div class="post-comments" id="comments-${post._id}" style="display:none">
@@ -148,7 +148,7 @@ async function likePost(postId, btn) {
   const res = await API.post(`/posts/${postId}/like`);
   if (res?.success) {
     btn.classList.toggle('liked', res.liked);
-    btn.querySelector('.like-icon').textContent = res.liked ? '❤️' : '🤍';
+    btn.querySelector('.like-icon').innerHTML = res.liked ? Icon.heartFilled : Icon.heart;
     document.getElementById(`likes-${postId}`).textContent = formatNum(res.likesCount);
     if (res.liked) btn.querySelector('.like-icon').style.animation = 'none', requestAnimationFrame(() => btn.querySelector('.like-icon').style.animation = '');
   }
@@ -199,7 +199,7 @@ function handleImageSelect(e) {
   const container = document.getElementById('imagePreviewContainer');
   container.innerHTML = selectedImages.map((f, i) => {
     const url = URL.createObjectURL(f);
-    return `<div class="preview-img-wrap"><img src="${url}" alt=""><div class="preview-remove" onclick="removePreviewImg(${i})">✕</div></div>`;
+    return `<div class="preview-img-wrap"><img src="${url}" alt=""><div class="preview-remove" onclick="removePreviewImg(${i})">${Icon.x}</div></div>`;
   }).join('');
 }
 
@@ -230,7 +230,7 @@ async function submitPost() {
 
   if (res?.success) {
     closeCreateModal();
-    Toast.success('Đăng bài thành công! 🎉');
+    Toast.success('Đăng bài thành công!');
     if (!selectedVideo) { const feed = document.getElementById('feed'); const temp = document.createElement('div'); renderPost({ ...res.post, likes: [], comments: [] }); }
     else { loadFeed(true); }
   } else { Toast.error(res?.message || 'Đăng bài thất bại'); }
@@ -276,7 +276,7 @@ function setupSocket() {
   if (!user || typeof io === 'undefined') return;
   const socket = io(API_URL.replace('/api', ''), { auth: { userId: user._id } });
   socket.on('notification', (data) => {
-    const msgs = { like: '❤️ đã thích bài viết của bạn', comment: '💬 đã bình luận bài viết của bạn', follow: '👤 đã theo dõi bạn' };
+    const msgs = { like: 'đã thích bài viết của bạn', comment: 'đã bình luận bài viết của bạn', follow: 'đã theo dõi bạn' };
     Toast.info(`${data.sender?.displayName} ${msgs[data.type] || ''}`);
   });
 }

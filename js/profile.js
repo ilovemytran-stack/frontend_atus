@@ -4,6 +4,10 @@ const username = new URLSearchParams(location.search).get('u') || me?.username;
 let profileUser = null;
 let profileTab = 'posts';
 
+function escapeHTML(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   Layout.init();
   if (!username) return (location.href = 'login.html');
@@ -32,14 +36,14 @@ function renderProfile() {
   if (isMe) document.getElementById('profileAvatar').onclick = () => openAvatarMenu();
 
   document.getElementById('profileDisplayName').textContent = u.displayName || u.username;
-  document.getElementById('profileVerified').textContent = u.isVerified ? '✅' : '';
+  document.getElementById('profileVerified').innerHTML = u.isVerified ? Icon.check : '';
   document.getElementById('profileUsername').textContent = '@' + u.username;
   document.getElementById('profileBio').textContent = u.bio || '';
 
   const metaParts = [];
-  if (u.location) metaParts.push(`📍 ${u.location}`);
-  if (u.website) metaParts.push(`🔗 <a href="${u.website}" target="_blank" style="color:var(--text-link)">${u.website}</a>`);
-  metaParts.push(`📅 Tham gia ${new Date(u.createdAt).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`);
+  if (u.location) metaParts.push(`${Icon.pin} ${escapeHTML(u.location)}`);
+  if (u.website) metaParts.push(`${Icon.link} <a href="${escapeHTML(u.website)}" target="_blank" rel="noopener noreferrer" style="color:var(--text-link)">${escapeHTML(u.website)}</a>`);
+  metaParts.push(`${Icon.calendar} Tham gia ${new Date(u.createdAt).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`);
   document.getElementById('profileMeta').innerHTML = metaParts.map(p => `<span>${p}</span>`).join('');
 
   document.getElementById('statPosts').querySelector('strong').textContent = formatNum(u.postsCount);
@@ -48,11 +52,11 @@ function renderProfile() {
 
   const actions = document.getElementById('profileActions');
   if (isMe) {
-    actions.innerHTML = `<button class="btn btn-secondary" onclick="openEditModal()">✏️ Chỉnh sửa</button>`;
+    actions.innerHTML = `<button class="btn btn-secondary" onclick="openEditModal()">${Icon.pencil} Chỉnh sửa</button>`;
   } else if (me) {
     actions.innerHTML = `
       <button class="btn ${u.isFollowing ? 'btn-secondary' : 'btn-primary'}" id="followBtn" onclick="toggleFollow()">${u.isFollowing ? 'Đang theo dõi' : 'Theo dõi'}</button>
-      <button class="btn btn-secondary" onclick="startChat()">💬 Nhắn tin</button>`;
+      <button class="btn btn-secondary" onclick="startChat()">${Icon.message} Nhắn tin</button>`;
   } else {
     actions.innerHTML = `<a href="login.html" class="btn btn-primary">Theo dõi</a>`;
   }
@@ -352,9 +356,9 @@ function renderProfilePost(post) {
     ${post.content ? `<div class="post-content">${post.content.replace(/</g,'&lt;')}</div>` : ''}
     ${post.images?.length ? `<div class="post-images count-${Math.min(post.images.length,4)}">${post.images.slice(0,4).map(img => `<img class="post-img" src="${img.url}" alt="">`).join('')}</div>` : ''}
     <div class="post-actions">
-      <button class="post-action-btn ${isLiked ? 'liked' : ''}">${isLiked ? '❤️' : '🤍'} ${formatNum(post.likesCount)}</button>
-      <button class="post-action-btn">💬 ${formatNum(post.commentsCount)}</button>
-      <button class="post-action-btn">🔗 ${formatNum(post.sharesCount)}</button>
+      <button class="post-action-btn ${isLiked ? 'liked' : ''}">${isLiked ? Icon.heartFilled : Icon.heart} ${formatNum(post.likesCount)}</button>
+      <button class="post-action-btn">${Icon.message} ${formatNum(post.commentsCount)}</button>
+      <button class="post-action-btn">${Icon.link} ${formatNum(post.sharesCount)}</button>
     </div>`;
   document.getElementById('profilePosts').appendChild(div);
 }

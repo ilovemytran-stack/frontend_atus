@@ -91,9 +91,20 @@ const Toast = {
       const d = document.createElement('div'); d.id = 'toast-container'; document.body.appendChild(d); return d;
     })();
     const toast = document.createElement('div');
-    const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+    // SVG tự thân (không phụ thuộc Icon của layout.js) vì api.js được dùng cả ở những trang
+    // không tải layout.js (ví dụ trang đăng nhập/đăng ký).
+    const svgWrap = (p) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+    const icons = {
+      success: svgWrap('<path d="M4 12.5l5.5 5.5L20 6.5"/>'),
+      error: svgWrap('<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>'),
+      info: svgWrap('<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>'),
+    };
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${msg}</span>`;
+    const iconSpan = document.createElement('span');
+    iconSpan.innerHTML = icons[type] || icons.info; // markup do chính file này viết ra, an toàn
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = msg; // msg có thể echo lại nội dung từ server/người dùng -> luôn qua textContent
+    toast.append(iconSpan, msgSpan);
     container.appendChild(toast);
     requestAnimationFrame(() => { requestAnimationFrame(() => toast.classList.add('show')); });
     setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, duration);

@@ -84,7 +84,7 @@ async function loadExploreGrid() {
   document.getElementById('exploreGrid').innerHTML = items.map(it => `
     <a href="${it.type === 'video' ? 'videos.html' : 'post.html?id=' + it.id}" class="explore-item">
       ${it.type === 'video' ? `<video src="${it.url}" muted></video><span class="explore-video-badge">▶</span>` : `<img src="${it.url}" alt="" loading="lazy">`}
-      <div class="explore-item-overlay">${it.type === 'video' ? '👁 ' + formatNum(it.views) : '❤️ ' + formatNum(it.likes)}</div>
+      <div class="explore-item-overlay">${it.type === 'video' ? Icon.eye + ' ' + formatNum(it.views) : Icon.heartFilled + ' ' + formatNum(it.likes)}</div>
     </a>`).join('');
 }
 
@@ -106,7 +106,7 @@ const handleSearch = debounce(async () => {
 
   let html = '<div class="search-results-section">';
   if (users.length) {
-    html += `<div class="search-section-title">👤 Người dùng</div>`;
+    html += `<div class="search-section-title">${Icon.user} Người dùng</div>`;
     html += users.map(u => `
       <a href="profile.html?u=${u.username}" class="suggested-user">
         <img src="${avatarURL(u)}" class="avatar avatar-sm" alt="">
@@ -117,12 +117,12 @@ const handleSearch = debounce(async () => {
       </a>`).join('');
   }
   if (videos.length) {
-    html += `<div class="search-section-title">🎬 Video</div><div class="explore-grid" style="margin:0 -16px">`;
+    html += `<div class="search-section-title">${Icon.film} Video</div><div class="explore-grid" style="margin:0 -16px">`;
     html += videos.map(v => `<a href="videos.html" class="explore-item"><video src="${v.url}" muted></video></a>`).join('');
     html += `</div>`;
   }
   if (posts.length) {
-    html += `<div class="search-section-title">📝 Bài viết</div>`;
+    html += `<div class="search-section-title">${Icon.pencil} Bài viết</div>`;
     html += posts.map(p => `<a href="post.html?id=${p._id}" style="display:block;padding:10px 0;border-bottom:1px solid var(--border)"><strong>${p.author.displayName}</strong>: ${(p.content||'').slice(0,80)}</a>`).join('');
   }
   if (!users.length && !posts.length && !videos.length) html += '<p style="text-align:center;color:var(--text-muted);padding:40px">Không tìm thấy kết quả nào</p>';

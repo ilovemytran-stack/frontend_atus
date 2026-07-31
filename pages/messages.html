@@ -50,7 +50,7 @@
         </div>
         <div id="chatActive" style="display:none;height:100%;display:none;flex-direction:column">
           <div class="chat-header">
-            <button class="btn btn-ghost btn-icon" id="chatBackBtn" onclick="closeChatWindow()">←</button>
+            <button class="btn btn-ghost btn-icon" id="chatBackBtn" onclick="closeChatWindow()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>
             <img src="" class="avatar avatar-md" id="chatPartnerAvatar" alt="">
             <div class="chat-header-info">
               <div class="chat-partner-name" id="chatPartnerName"></div>
@@ -62,9 +62,9 @@
           <div class="chat-input-bar">
             <label class="btn btn-ghost btn-icon" for="chatImageInput" aria-label="Gửi ảnh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></label>
             <input type="file" id="chatImageInput" accept="image/*" style="display:none" onchange="sendImageMessage(event)">
-            <button class="btn btn-ghost btn-icon" onclick="toggleEmojiPicker()">😊</button>
+            <button class="btn btn-ghost btn-icon" onclick="toggleEmojiPicker()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10h.01M15.5 10h.01M8 15c.8 1 2.2 1.6 4 1.6s3.2-.6 4-1.6"/></svg></button>
             <input class="chat-input" id="chatInput" placeholder="Nhập tin nhắn..." onkeydown="handleChatKeydown(event)" oninput="handleTyping()">
-            <button class="btn btn-primary btn-icon" onclick="sendMessage()">➤</button>
+            <button class="btn btn-primary btn-icon" onclick="sendMessage()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
           </div>
           <div class="emoji-picker" id="emojiPicker" style="display:none"></div>
         </div>

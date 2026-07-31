@@ -106,29 +106,68 @@ function loop(ts) {
   lastT = now;
 
   updatePlayerMovement(dt);
+  checkMapEdgeTransition();
   if (GL.autoAttackTarget) GL.updateAutoAttackTick(dt);
   GL.updateMonsters(dt, performance.now());
   GL.updateSummons(dt, performance.now());
+  GL.updatePets(dt, performance.now());
+  GL.updateAuraPulse(dt);
   updateCamera();
   GL.maybeSendPosition(performance.now());
-  GL.renderFrame(now);
+  GL.renderFrame(now, dt);
 
   requestAnimationFrame(loop);
 }
 
+// Đi qua "hành lang" giữa các map TRONG CÙNG 1 lục địa (như Ngọc Rồng Online / Ninja School):
+// đi bộ sát mép trái/phải của map là tự chuyển sang map liền kề, xuất hiện ở mép đối diện của
+// map mới — miễn phí, không cần Truyền Tống Phù (lá đó chỉ bắt buộc khi đổi LỤC ĐỊA khác).
+let mapTransitionLock = false;
+async function checkMapEdgeTransition() {
+  if (mapTransitionLock || !GL.map) return;
+  const EDGE = 6;
+  let targetIdx = null;
+  if (GL.player.x <= GL.WORLD.pad + EDGE) targetIdx = GL.map.index - 1;
+  else if (GL.player.x >= GL.WORLD.w - GL.WORLD.pad - EDGE) targetIdx = GL.map.index + 1;
+  if (targetIdx == null || targetIdx < 1 || targetIdx > 6) return;
+  const nextMap = GL.mapById(`${GL.map.continentId}_${targetIdx}`);
+  if (!nextMap) return;
+
+  mapTransitionLock = true;
+  const enteringFromRight = targetIdx < GL.map.index; // đi sang map bên trái -> xuất hiện ở mép PHẢI map mới
+  const spawnX = enteringFromRight ? GL.WORLD.w - GL.WORLD.pad - 24 : GL.WORLD.pad + 24;
+  try {
+    const res = await API.post('/game/character/move', { mapId: nextMap.id, x: spawnX, y: 300 });
+    if (!res?.success) { GL.toast(res?.message || 'Không thể di chuyển'); return; }
+    GL.char = res.character; GL.updateCurrencyUI();
+    GL.player.x = spawnX;
+    GL.joinMap(nextMap);
+    GL.toast(nextMap.name, '', 'arrow-right');
+  } catch (err) { console.error(err); }
+  finally { setTimeout(() => { mapTransitionLock = false; }, 600); }
+}
+
 function updatePlayerMovement(dt) {
-  const { dx } = GL.input; // chỉ dùng trục ngang — mô hình cuộn ngang như Ngọc Rồng Online
+  const { dx } = GL.input; // chỉ dùng trục ngang cho di chuyển thật — trục dọc (dy) của joystick tròn
+  // chỉ dùng để KÍCH HOẠT nhảy (xem GL.initControls), không trực tiếp đổi toạ độ Y logic — giữ nguyên
+  // mô hình cuộn ngang 1 trục cho va chạm/tấn công, "nhảy" chỉ là hiệu ứng hiển thị (player.z ở game-render.js).
   const stats = GL.currentStats();
-  const speed = 95 + stats.spd * 14;
-  const moving = Math.abs(dx) > 0.05;
+  const spdBuffMult = performance.now() < (GL.player.buffSpdUntil || 0) ? 1 + (GL.player.buffSpdPct || 0) : 1;
+  const speed = (95 + stats.spd * 14) * spdBuffMult;
   GL.player.y = GL.GROUND_Y; // luôn đứng trên đường ground, không roaming tự do nữa
-  if (!GL.autoAttackTarget) {
+  const dashing = performance.now() < (GL.player.dashUntil || 0);
+  if (dashing) {
+    GL.player.moving = true;
+    GL.player.x = clamp(GL.player.x + GL.player.dashDir * (speed * 3.4) * dt, GL.WORLD.pad, GL.WORLD.w - GL.WORLD.pad);
+  } else if (!GL.autoAttackTarget) {
+    const moving = Math.abs(dx) > 0.05;
     GL.player.moving = moving;
     if (moving) {
       GL.player.dir = dx >= 0 ? 1 : -1;
       GL.player.x = clamp(GL.player.x + dx * speed * dt, GL.WORLD.pad, GL.WORLD.w - GL.WORLD.pad);
     }
   }
+  GL.updateJumpFly(dt);
   GL.player.attackCooldown = Math.max(0, (GL.player.attackCooldown || 0) - dt);
   if (GL.player.attackFx > 0) GL.player.attackFx -= dt;
   GL.player.skillCd[0] = Math.max(0, GL.player.skillCd[0] - dt);
@@ -140,8 +179,12 @@ function updatePlayerMovement(dt) {
     kiUiAccum += dt;
     if (kiUiAccum > 0.2) { kiUiAccum = 0; GL.updateVitalsUI(); }
   }
+  // Đồng bộ lại chỉ số pet mỗi ~1s (lên cấp / đổi đồ / dùng item pet...) mà KHÔNG reset vị trí/% HP,
+  // rẻ hơn nhiều so với sửa lại từng nơi gọi API set GL.char (xem ghi chú trong spawnPetsFromChar).
+  petSyncAccum += dt;
+  if (petSyncAccum > 1) { petSyncAccum = 0; if (GL.char?.pets?.length) GL.spawnPetsFromChar(); }
 }
-let kiUiAccum = 0;
+let kiUiAccum = 0, petSyncAccum = 0;
 
 function updateCamera() {
   const vw = window.innerWidth, vh = window.innerHeight;

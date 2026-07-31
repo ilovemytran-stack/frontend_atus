@@ -156,7 +156,10 @@ function itemLabel(it) {
 }
 
 function renderTheirOffer(offer) {
-  document.getElementById('glTradeTheirCurrency').textContent = `🪙 ${offer.gold || 0} · 💎 ${offer.gem || 0}`;
+  document.getElementById('glTradeTheirCurrency').innerHTML =
+    `${GL.icon('coin', 'gl-icon-sm')} <span></span> · ${GL.icon('gem', 'gl-icon-sm')} <span></span>`;
+  const [goldSpan, gemSpan] = document.querySelectorAll('#glTradeTheirCurrency span');
+  goldSpan.textContent = offer.gold || 0; gemSpan.textContent = offer.gem || 0;
   document.getElementById('glTradeTheirItems').innerHTML = (offer.items || []).map((it) => `<div class="gl-item-chip"><div class="gl-item-name">${itemLabel(it)}${it.qty > 1 ? ' ×' + it.qty : ''}</div></div>`).join('') || `<div style="grid-column:1/-1;color:var(--gl-text-dim);font-size:.7rem;text-align:center">Chưa đề nghị gì</div>`;
 }
 

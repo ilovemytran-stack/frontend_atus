@@ -7,11 +7,11 @@ GL.WORLD = { w: 3200, h: 220, pad: 100 };
 GL.GROUND_Y = 150; // đường "mặt đất" cố định — nhân vật/quái/NPC luôn đứng trên đường này
 
 GL.NPC_DEFS = [
-  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: '📜', x: 180, y: GL.GROUND_Y, kind: 'quest' },
-  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: '🌀', x: 300, y: GL.GROUND_Y, kind: 'portal' },
-  { id: 'npc_potion', name: 'Dược Sư', icon: '🧪', x: 420, y: GL.GROUND_Y, kind: 'potion' },
-  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: '⚔️', x: 540, y: GL.GROUND_Y, kind: 'weapon' },
-  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: '🛡️', x: 660, y: GL.GROUND_Y, kind: 'armor' },
+  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: 'scroll', x: 180, y: GL.GROUND_Y, kind: 'quest' },
+  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: 'portal', x: 300, y: GL.GROUND_Y, kind: 'portal' },
+  { id: 'npc_potion', name: 'Dược Sư', icon: 'flask', x: 420, y: GL.GROUND_Y, kind: 'potion' },
+  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: 'sword', x: 540, y: GL.GROUND_Y, kind: 'weapon' },
+  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: 'shield', x: 660, y: GL.GROUND_Y, kind: 'armor' },
 ];
 
 // Rắc điểm dọc theo 1 đường ngang, cách đều + rung nhẹ (thay cho lưới 2D cũ)
@@ -118,6 +118,7 @@ GL.updateMonsters = function (dt, now) {
       }
       return;
     }
+    if (m.stunnedUntil && performance.now() < m.stunnedUntil) return; // choáng do Chiêu 3 V1 của pet — đứng im, không đánh/đuổi
     let target = p, bestD = GL.distX(m, p);
     (GL.summons || []).forEach((s) => { if (!s.alive) return; const d = GL.distX(m, s); if (d < bestD) { target = s; bestD = d; } });
 
@@ -189,4 +190,164 @@ GL.updateSummons = function (dt, now) {
       } else s.state = 'idle';
     }
   });
+};
+
+// ---------- Pet (bản cập nhật Pet-Aura) ----------
+// Khác Summon: pet KHÔNG có expiresAt (tồn tại vĩnh viễn cho tới khi chết rồi tự hồi sinh sau 3 phút),
+// có 3 chế độ đổi qua chat (def/atk/fl) hoặc bảng Pet, và có tối đa 3 chiêu mở dần theo level (đồng bộ
+// theo char.level, xem GL.data.petSkill2Versions/petSkill3Versions/petSkill4).
+// LƯU Ý ĐẶT TÊN: `defObj` = object định nghĩa loại pet (tên/portrait/frameCount, từ GL.data.pets), còn
+// `def` (không có Obj) = CHỈ SỐ PHÒNG THỦ, đúng quy ước đang dùng cho quái/summon (m.def, s.def...).
+GL.spawnPetsFromChar = function (opts = {}) {
+  const fresh = !!opts.fresh; // true khi mới vào game / vừa đổi map -> đặt lại vị trí cạnh chủ + đầy HP
+  const list = (GL.char.pets || []).map((p, idx) => {
+    const existing = GL.pets.find((x) => x.slot === idx && x.defId === p.defId);
+    if (existing && !fresh) {
+      // Pet vẫn còn đó giữa 2 lần đồng bộ dữ liệu (VD: vừa lên cấp) — CHỈ cập nhật lại chỉ số/chiêu
+      // theo dữ liệu mới nhất, KHÔNG đụng vị trí hay % HP hiện tại (tránh giật hình khi đang giao tranh).
+      const hpRatio = existing.maxHp > 0 ? existing.hp / existing.maxHp : 1;
+      existing.defObj = GL.data.pets[p.defId];
+      existing.maxHp = p.stats.hp; existing.hp = existing.isDead ? 0 : Math.round(p.stats.hp * hpRatio);
+      existing.maxKi = p.stats.ki; existing.atk = p.stats.atk; existing.def = p.stats.def;
+      existing.mode = p.mode; existing.skill2Version = p.skill2Version; existing.skill3Version = p.skill3Version; existing.hasSkill4 = p.hasSkill4;
+      if (!existing.isDead && p.isDead) { existing.isDead = true; existing.deadUntil = new Date(p.deadUntil).getTime(); }
+      return existing;
+    }
+    return {
+      uid: 'pet_' + idx, slot: idx, defId: p.defId, defObj: GL.data.pets[p.defId], role: p.role,
+      x: GL.player.x + (idx === 0 ? -34 : 34), y: GL.GROUND_Y, dir: 1,
+      hp: p.stats.hp, maxHp: p.stats.hp, atk: p.stats.atk, def: p.stats.def, ki: p.stats.ki, maxKi: p.stats.ki,
+      mode: p.mode, skill2Version: p.skill2Version, skill3Version: p.skill3Version, hasSkill4: p.hasSkill4,
+      isDead: p.isDead, deadUntil: p.deadUntil ? new Date(p.deadUntil).getTime() : 0,
+      state: 'idle', attackTimer: 0, skill2Cd: 0, skill3Cd: 0, skill4Cd: 0, skill4ActiveUntil: 0,
+      frameT: Math.random() * 8, reportedDead: false,
+    };
+  });
+  GL.pets = list;
+};
+
+GL.damagePet = function (pet, dmg) {
+  if (pet.isDead) return;
+  pet.hp = Math.max(0, pet.hp - dmg);
+  if (pet.hp <= 0 && !pet.isDead) {
+    pet.isDead = true;
+    pet.deadUntil = performance.now() + GL.data.petDeathMs;
+    pet.state = 'idle';
+    if (!pet.reportedDead) {
+      pet.reportedDead = true;
+      API.post('/game/character/pet/death', { slot: pet.slot }).catch(() => {});
+    }
+    GL.toast(`${pet.defObj?.name || 'Pet'} đã gục, sẽ hồi sinh sau 3 phút`, '', 'skull');
+  }
+};
+
+function petSkillMultCd(pet) {
+  const s2 = pet.skill2Version ? GL.data.petSkill2Versions[pet.skill2Version] : null;
+  const s3 = pet.skill3Version ? GL.data.petSkill3Versions[pet.skill3Version] : null;
+  return { s2, s3 };
+}
+
+// Chiêu 2 (tầm xa, "chưởng") — bắn thẳng vào mục tiêu hiện tại, không cần lại gần
+function petCastSkill2(pet, target, s2) {
+  pet.skill2Cd = s2.cd;
+  const dmgInfo = GL.rollDamage(pet.atk * s2.mult * GL.auraDmgMult(), target.def || 0, 5);
+  if (target === 'boss') { GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg }); GL.spawnDamageNumber(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y - 50, dmgInfo.dmg, 'gl-crit'); }
+  else GL.applyMonsterHit(target, dmgInfo);
+  GL.spawnDamageNumber(pet.x, pet.y - 40, 'Chưởng!', '');
+}
+
+// Chiêu 3 (66s cd, stun hoặc DoT tuỳ version) — level-scale thay cho "điểm cộng tay" (pet không có điểm chiêu riêng, xem gameData.js)
+function petCastSkill3(pet, target, s3) {
+  pet.skill3Cd = s3.cd;
+  if (s3.effect === 'stun') {
+    const steps = Math.min(s3.maxBonus / s3.durationPerLevelStep, Math.floor((GL.char.level || 1) / s3.levelStep));
+    const dur = s3.durationBase + steps * s3.durationPerLevelStep;
+    if (target !== 'boss') target.stunnedUntil = performance.now() + dur * 1000;
+    GL.spawnDamageNumber(pet.x, pet.y - 40, `Choáng ${dur.toFixed(1)}s!`, 'gl-crit');
+  } else {
+    const totalPct = s3.pctPerSec * s3.duration;
+    const dmgInfo = { dmg: Math.round((target === 'boss' ? 5000 : target.maxHp) * totalPct), crit: false };
+    if (target === 'boss') GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg });
+    else GL.applyMonsterHit(target, dmgInfo);
+    GL.spawnDamageNumber(pet.x, pet.y - 40, 'Độc!', 'gl-crit');
+  }
+}
+
+// Chiêu 4 (level 60, cố định) — triệu hồi "Mini Monster" bay theo pet 40s, không thể bị chọn làm mục tiêu
+GL.petMiniMonsters = [];
+function petCastSkill4(pet) {
+  const s4 = GL.data.petSkill4;
+  pet.skill4Cd = s4.cd;
+  pet.skill4ActiveUntil = performance.now() + s4.duration * 1000;
+  GL.toast(`${pet.defObj.name} triệu hồi Tiểu Quái đồng hành!`, '', 'sparkles');
+}
+
+GL.updatePets = function (dt, now) {
+  GL.pets.forEach((pet) => {
+    if (pet.isDead) {
+      if (performance.now() >= pet.deadUntil && pet.deadUntil) {
+        pet.isDead = false; pet.reportedDead = false;
+        pet.hp = pet.maxHp; pet.x = GL.player.x + (pet.slot === 0 ? -34 : 34); pet.y = GL.GROUND_Y;
+      }
+      return;
+    }
+    pet.frameT += dt;
+    pet.skill2Cd = Math.max(0, pet.skill2Cd - dt); pet.skill3Cd = Math.max(0, pet.skill3Cd - dt); pet.skill4Cd = Math.max(0, pet.skill4Cd - dt);
+
+    if (pet.mode === 'fl') { // Theo: chỉ bám chủ, không tấn công
+      const d = GL.distX(pet, GL.player);
+      if (d > 60) { const dirX = GL.player.x >= pet.x ? 1 : -1; pet.x += dirX * 130 * dt; pet.dir = dirX; pet.state = 'chase'; }
+      else pet.state = 'idle';
+      return;
+    }
+
+    const guardRange = pet.mode === 'def' ? 130 : 300; // Thủ: chỉ đánh quái gần CHỦ | Công: chủ động tìm xa hơn quanh pet
+    const originEntity = pet.mode === 'def' ? GL.player : pet;
+    let target = null, bestD = guardRange;
+    const bossNear = GL.nearestBossTarget ? GL.nearestBossTarget(guardRange) : null;
+    GL.monsters.forEach((m) => { if (!m.alive) return; const d = GL.distX(m, originEntity); if (d < bestD) { target = m; bestD = d; } });
+    if (!target && bossNear) target = 'boss';
+
+    if (!target) {
+      const d = GL.distX(pet, GL.player);
+      if (d > 90) { const dirX = GL.player.x >= pet.x ? 1 : -1; pet.x += dirX * 120 * dt; pet.dir = dirX; pet.state = 'chase'; }
+      else pet.state = 'idle';
+      return;
+    }
+
+    const tx = target === 'boss' ? GL.BOSS_SPOT.x : target.x;
+    const distToTarget = Math.abs(pet.x - tx);
+    const { s2, s3 } = petSkillMultCd(pet);
+
+    // Ưu tiên chiêu 3 (66s, mạnh) nếu đã học và hết hồi chiêu
+    if (s3 && pet.skill3Cd <= 0) { petCastSkill3(pet, target, s3); return; }
+    // Xa mà có chiêu 2 (chưởng) thì dùng luôn không cần lại gần; chưa có thì lao vào đấm
+    if (distToTarget > 40 && s2 && pet.skill2Cd <= 0) { petCastSkill2(pet, target, s2); return; }
+    if (pet.hasSkill4 && pet.skill4Cd <= 0 && Math.random() < 0.15) { petCastSkill4(pet); }
+
+    if (distToTarget > 34) {
+      const dirX = tx >= pet.x ? 1 : -1;
+      pet.x += dirX * 150 * dt; pet.dir = dirX; pet.state = 'chase';
+    } else {
+      pet.state = 'attack'; pet.attackTimer -= dt;
+      if (pet.attackTimer <= 0) {
+        pet.attackTimer = 0.9;
+        const dmgInfo = GL.rollDamage(pet.atk * GL.auraDmgMult(), target === 'boss' ? 0 : target.def, 8);
+        if (target === 'boss') { GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg }); GL.spawnDamageNumber(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y - 40, dmgInfo.dmg, dmgInfo.crit ? 'gl-crit' : ''); }
+        else GL.applyMonsterHit(target, dmgInfo);
+      }
+    }
+  });
+
+  // Tiểu Quái đồng hành (Chiêu 4) — bay theo pet, tự tấn công cùng lúc, không phải mục tiêu hợp lệ để bị đánh
+  GL.petMiniMonsters = GL.pets.filter((p) => !p.isDead && p.skill4ActiveUntil > performance.now());
+};
+
+// Lệnh gõ trong chat "def"/"atk"/"fl" — áp dụng cho TẤT CẢ pet đang sở hữu cùng lúc (đổi từng con riêng thì dùng bảng Pet)
+GL.setAllPetsMode = async function (mode) {
+  if (!GL.pets.length) { GL.toast('Bạn chưa có pet'); return; }
+  GL.pets.forEach((p) => { p.mode = mode; });
+  const label = { def: 'Thủ', atk: 'Tấn Công', fl: 'Theo' }[mode];
+  GL.toast(`Pet: ${label}`, '', 'paw');
+  await Promise.all(GL.pets.map((p) => API.post('/game/character/pet/mode', { slot: p.slot, mode }).catch(() => {})));
 };

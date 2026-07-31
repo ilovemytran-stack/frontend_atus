@@ -19,12 +19,23 @@ GL.initSocket = function () {
   GL.socket.on('game_player_attacked', ({ userId }) => {
     if (GL.remote[userId]) GL.remote[userId].attackFx = 0.2;
   });
-  GL.socket.on('game_chat_message', ({ name, text }) => GL.appendChat(name, text));
+  GL.socket.on('game_chat_message', ({ userId, name, text }) => GL.appendChat(userId, name, text));
   GL.socket.on('game_world_chat_message', ({ userId, name, text }) => GL.appendWorldChat(name, text, userId === GL.me._id));
   GL.socket.on('game_guild_chat_message', ({ userId, name, text }) => {
     GL.guildChatHistory.push({ userId, name, text });
     while (GL.guildChatHistory.length > 60) GL.guildChatHistory.shift();
     GL.appendGuildChat(name, text, userId === GL.me._id);
+  });
+
+  // Hào Quang: người khác vừa phát "tiếng vang" gần đó -> nếu trong bán kính thì TỰ cộng buff +8%
+  // sát thương cho bản thân (không cần server tính hộ, xem GL.auraDmgMult ở game-controls.js).
+  GL.socket.on('game_aura_pulse_received', ({ userId }) => {
+    const other = GL.remote[userId];
+    if (!other) return;
+    const d = GL.distX(other, GL.player);
+    if (d > (GL.data.aura?.pulse?.radius || 150)) return;
+    GL.auraDmgBuffUntil = performance.now() + (GL.data.aura?.pulse?.buffDurationSec || 8) * 1000;
+    GL.nearbyAuraPulses.push({ userId, x: other.x, y: other.y, until: performance.now() + 1200 });
   });
 
   GL.socket.on('game_zone_assigned', ({ mapId, zone }) => {
@@ -52,6 +63,7 @@ GL.joinMap = function (map, zoneWanted) {
   loadMapProps(map);
   GL.updateMapLabel();
   GL.spawnMonsters(map);
+  GL.spawnPetsFromChar({ fresh: true });
   GL.socketEmit('game_leave_map', { mapId: GL.map.id });
   GL.socketEmit('game_join_map', {
     mapId: map.id,

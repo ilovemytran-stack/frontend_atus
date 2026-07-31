@@ -86,36 +86,36 @@ function renderVideoCard(video, idx) {
   card.dataset.videoId = video._id;
   card.innerHTML = `
     <video class="video-player" id="vplayer-${video._id}" src="${video.url}" loop playsinline muted preload="metadata" poster="${video.thumbnail || ''}" onclick="togglePlay(this)"></video>
-    <button class="video-mute-btn" onclick="toggleMute(event, '${video._id}')">🔇</button>
+    <button class="video-mute-btn" onclick="toggleMute(event, '${video._id}')">${Icon.mute}</button>
     <div class="video-overlay">
       <div class="video-info">
         <a href="profile.html?u=${video.author.username}" class="video-author">
           <img src="${avatarURL(video.author)}" class="avatar avatar-sm" alt="">
           <span>${video.author.displayName || video.author.username}</span>
-          ${video.author.isVerified ? '✅' : ''}
+          ${video.author.isVerified ? Icon.check : ''}
         </a>
         ${video.title ? `<div class="video-title">${escapeHTML(video.title)}</div>` : ''}
         ${video.description ? `<div class="video-desc">${escapeHTML(video.description)}</div>` : ''}
-        ${video.music?.name ? `<div class="video-music">🎵 ${video.music.name}${video.music.artist ? ' - ' + video.music.artist : ''}</div>` : ''}
+        ${video.music?.name ? `<div class="video-music">${Icon.music} ${video.music.name}${video.music.artist ? ' - ' + video.music.artist : ''}</div>` : ''}
       </div>
       <div class="video-actions">
         <button class="video-action ${isLiked ? 'liked' : ''}" id="vlike-${video._id}" onclick="likeVideo('${video._id}', this)">
-          <span class="video-action-icon">${isLiked ? '❤️' : '🤍'}</span>
+          <span class="video-action-icon">${isLiked ? Icon.heartFilled : Icon.heart}</span>
           <span>${formatNum(video.likesCount)}</span>
         </button>
         <button class="video-action" onclick="openVideoComments('${video._id}')">
-          <span class="video-action-icon">💬</span>
+          <span class="video-action-icon">${Icon.message}</span>
           <span>${formatNum(video.commentsCount)}</span>
         </button>
         <button class="video-action" onclick="shareVideo('${video._id}')">
-          <span class="video-action-icon">🔗</span>
+          <span class="video-action-icon">${Icon.link}</span>
           <span>${formatNum(video.sharesCount)}</span>
         </button>
         <div class="video-action">
-          <span class="video-action-icon">👁</span>
+          <span class="video-action-icon">${Icon.eye}</span>
           <span>${formatNum(video.viewsCount)}</span>
         </div>
-        ${user?._id === video.author._id ? `<button class="video-action" onclick="deleteVideo('${video._id}')"><span class="video-action-icon">🗑</span></button>` : ''}
+        ${user?._id === video.author._id ? `<button class="video-action" onclick="deleteVideo('${video._id}')"><span class="video-action-icon">${Icon.trash}</span></button>` : ''}
       </div>
     </div>
     <div class="video-play-indicator" id="play-${video._id}">▶</div>`;
@@ -157,7 +157,7 @@ function toggleMute(e, videoId) {
   e.stopPropagation();
   videosMuted = !videosMuted;
   document.querySelectorAll('.video-player').forEach(v => v.muted = videosMuted);
-  document.querySelectorAll('.video-mute-btn').forEach(b => b.textContent = videosMuted ? '🔇' : '🔊');
+  document.querySelectorAll('.video-mute-btn').forEach(b => b.innerHTML = videosMuted ? Icon.mute : Icon.volume);
 }
 
 async function likeVideo(videoId, btn) {
@@ -165,7 +165,7 @@ async function likeVideo(videoId, btn) {
   const res = await API.post(`/videos/${videoId}/like`);
   if (res?.success) {
     btn.classList.toggle('liked', res.liked);
-    btn.querySelector('.video-action-icon').textContent = res.liked ? '❤️' : '🤍';
+    btn.querySelector('.video-action-icon').innerHTML = res.liked ? Icon.heartFilled : Icon.heart;
     btn.querySelector('span:last-child').textContent = formatNum(res.likesCount);
   }
 }
@@ -192,7 +192,7 @@ async function openVideoComments(videoId) {
     <div class="comment-sheet-handle"></div>
     <div class="comment-sheet-header">
       <span style="font-weight:700">${formatNum(res.video.commentsCount)} bình luận</span>
-      <button class="btn btn-ghost btn-icon" onclick="this.closest('.comment-sheet').remove()">✕</button>
+      <button class="btn btn-ghost btn-icon" onclick="this.closest('.comment-sheet').remove()">${Icon.x}</button>
     </div>
     <div class="comment-sheet-list" id="csl-${videoId}">
       ${res.video.comments?.map(c => `

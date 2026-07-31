@@ -36,11 +36,11 @@ body::before { content: ''; position: fixed; inset: 0; background: radial-gradie
 <body>
 <div class="auth-box">
   <div class="brand">
-    <div class="brand-logo">🌐</div>
+    <div class="brand-logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a13 13 0 0 1 0 18M12 3a13 13 0 0 0 0 18"/></svg></div>
     <div class="brand-name">Public</div>
   </div>
   <div class="auth-card">
-    <div class="auth-title">Tạo tài khoản mới ✨</div>
+    <div class="auth-title">Tạo tài khoản mới</div>
     <div class="form">
       <div class="row-2">
         <div class="input-group">
@@ -55,25 +55,25 @@ body::before { content: ''; position: fixed; inset: 0; background: radial-gradie
       <div class="input-group">
         <label class="input-label">Email</label>
         <div class="input-wrap">
-          <span class="input-icon">📧</span>
+          <span class="input-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
           <input class="input has-icon" id="email" placeholder="email@example.com" type="email">
         </div>
       </div>
       <div class="input-group">
         <label class="input-label">Mật khẩu</label>
         <div class="input-wrap">
-          <span class="input-icon">🔒</span>
+          <span class="input-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
           <input class="input has-icon" id="password" placeholder="Ít nhất 6 ký tự" type="password" oninput="checkStrength(this.value)">
-          <button class="input-toggle" onclick="togglePwd('password')">👁</button>
+          <button class="input-toggle" onclick="togglePwd('password')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
         <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
       </div>
       <div class="input-group">
         <label class="input-label">Xác nhận mật khẩu</label>
         <div class="input-wrap">
-          <span class="input-icon">🔒</span>
+          <span class="input-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
           <input class="input has-icon" id="confirmPassword" placeholder="Nhập lại mật khẩu" type="password">
-          <button class="input-toggle" onclick="togglePwd('confirmPassword')">👁</button>
+          <button class="input-toggle" onclick="togglePwd('confirmPassword')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
       <p class="terms">Bằng cách đăng ký, bạn đồng ý với <a href="#">Điều khoản</a> và <a href="#">Chính sách bảo mật</a></p>
@@ -124,7 +124,7 @@ async function register() {
     API.setToken(res.token);
     localStorage.setItem('ss_refresh', res.refreshToken);
     API.saveUser(res.user);
-    Toast.success('Đăng ký thành công! Chào mừng 🎉');
+    Toast.success('Đăng ký thành công! Chào mừng bạn.');
     setTimeout(() => window.location.href = 'feed.html', 800);
   } else {
     Toast.error(res?.message || 'Đăng ký thất bại');

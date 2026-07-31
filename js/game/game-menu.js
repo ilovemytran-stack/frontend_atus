@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (target === 'glPanelBestiary') { renderBestiaryPanel(); openPanelG('glPanelBestiary'); }
     else if (target === 'glPanelWorldChat') { GL.worldChatPanelOpen = true; openPanelG('glPanelWorldChat'); }
     else if (target === 'glPanelGuild') { renderGuildPanel(); openPanelG('glPanelGuild'); }
+    else if (target === 'glPanelPet') { renderPetPanel(); openPanelG('glPanelPet'); }
   });
 
   document.getElementById('glMenuLoadout').addEventListener('click', () => {

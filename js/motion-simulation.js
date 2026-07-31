@@ -12,6 +12,36 @@
 // Yêu cầu HTTPS (hoặc localhost) + quyền camera — getUserMedia() bị chặn trên file://.
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs";
 
+// SVG tự thân (module này có scope riêng, không thấy được `Icon` khai báo bằng const ở layout.js).
+const X_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+// Con trỏ hình bàn tay xoè trên canvas: fillText() không vẽ được emoji dạng vector đẹp và ổn định
+// theo mọi trình duyệt/hệ điều hành — vẽ trực tiếp 1 bàn tay xoè đơn giản bằng path, cùng phong
+// cách line-icon với phần còn lại của trang, để bám sát con trỏ mà không cần glyph emoji.
+function drawHandCursorGlyph(ctx, s) {
+  ctx.save();
+  ctx.strokeStyle = '#fff'; ctx.fillStyle = 'rgba(124,92,252,.25)';
+  ctx.lineWidth = s * 0.16; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.55, s * 0.5);
+  ctx.lineTo(-s * 0.55, -s * 0.05);
+  ctx.quadraticCurveTo(-s * 0.55, -s * 0.35, -s * 0.32, -s * 0.35);
+  ctx.lineTo(-s * 0.32, -s * 0.75);
+  ctx.quadraticCurveTo(-s * 0.32, -s, -s * 0.1, -s);
+  ctx.quadraticCurveTo(s * 0.12, -s, s * 0.12, -s * 0.75);
+  ctx.lineTo(s * 0.12, -s * 0.6);
+  ctx.quadraticCurveTo(s * 0.12, -s * 0.8, s * 0.34, -s * 0.8);
+  ctx.quadraticCurveTo(s * 0.56, -s * 0.8, s * 0.56, -s * 0.55);
+  ctx.lineTo(s * 0.56, -s * 0.15);
+  ctx.quadraticCurveTo(s * 0.56, -s * 0.32, s * 0.75, -s * 0.32);
+  ctx.quadraticCurveTo(s * 0.94, -s * 0.32, s * 0.94, -s * 0.1);
+  ctx.lineTo(s * 0.94, s * 0.15);
+  ctx.quadraticCurveTo(s * 0.94, s * 0.5, s * 0.6, s * 0.5);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
 const CONFIG = {
   PINCH_THRESHOLD: 0.35,          // khoảng cách ngón cái-trỏ (chuẩn hóa theo cỡ bàn tay) để tính là "chụm"
   EXTEND_RATIO: 1.1,              // đầu ngón phải xa cổ tay hơn khớp mcp bao nhiêu lần để tính là "duỗi"
@@ -95,7 +125,7 @@ class MotionSimulation {
       <div class="modal" style="max-width:380px">
         <div class="modal-header">
           <div class="modal-title">Mô phỏng chuyển động</div>
-          <button class="modal-close btn btn-ghost btn-icon" id="msConfirmCloseBtn">✕</button>
+          <button class="modal-close btn btn-ghost btn-icon" id="msConfirmCloseBtn">${X_ICON}</button>
         </div>
         <p style="color:var(--text-secondary);font-size:0.88rem;line-height:1.6;margin-bottom:20px">
           Điều khiển trang bằng cử chỉ tay qua webcam: di chuyển chuột, click, cuộn trang, zoom ảnh, đăng xuất...
@@ -114,7 +144,7 @@ class MotionSimulation {
     palette.innerHTML = `
       <div class="ms-palette-handle" id="msPaletteHandle">
         <span>MOTION SIM</span>
-        <button class="btn btn-ghost btn-icon-sm" id="msStopBtn" title="Tắt">✕</button>
+        <button class="btn btn-ghost btn-icon-sm" id="msStopBtn" title="Tắt">${X_ICON}</button>
       </div>
       <div class="ms-preview">
         <video id="msVideo" autoplay playsinline muted></video>
@@ -329,7 +359,7 @@ class MotionSimulation {
   }
 
   static triggerClose() {
-    Toast.info('👏 Phát hiện vỗ tay — nếu trình duyệt chặn tự đóng tab, hãy đóng thủ công.');
+    Toast.info('Phát hiện vỗ tay — nếu trình duyệt chặn tự đóng tab, hãy đóng thủ công.');
     // Trình duyệt chỉ cho phép script tự đóng tab/cửa sổ do chính nó mở ra bằng script,
     // nên với tab người dùng tự mở, lệnh dưới đây thường không có tác dụng — đó là giới
     // hạn bảo mật của trình duyệt, không phải lỗi của code.
@@ -337,7 +367,7 @@ class MotionSimulation {
   }
 
   static triggerLogout() {
-    Toast.info('✊ Phát hiện nắm tay — đang đăng xuất...');
+    Toast.info('Phát hiện nắm tay — đang đăng xuất...');
     this.stop();
     API.logout();
   }
@@ -357,12 +387,9 @@ class MotionSimulation {
       sPos.y += (y - sPos.y) * CONFIG.HAND_ICON_SMOOTHING;
       ctx.save();
       ctx.translate(sPos.x, sPos.y);
-      ctx.font = '24px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(124,92,252,.9)';
       ctx.shadowBlur = 8;
-      ctx.fillText('🖐️', 0, 0);
+      drawHandCursorGlyph(ctx, 12);
       ctx.restore();
     });
   }

@@ -10,12 +10,24 @@ window.GL = {
   continent: null,
   monsters: [],         // quái đang sống trên map (client-side, respawn theo timer)
   summons: [],           // thú triệu hồi của Malakai đang hoạt động
+  pets: [],              // pet của NGƯỜI CHƠI HIỆN TẠI đang hoạt động trên map (từ char.pets, tối đa 2)
   remote: {},           // userId -> {x,y,dir,moving,name,classId,level}
-  player: { x: 400, y: 300, dir: 1, moving: false, attackCooldown: 0, skillCd: [0, 0], zone: 1 },
+  player: {
+    x: 400, y: 300, dir: 1, moving: false, attackCooldown: 0, skillCd: [0, 0], zone: 1,
+    // Nhảy/Bay (yêu cầu mới: joystick tròn kéo lên = nhảy, nút Bay = bay tốn Ki liên tục) — z/vz CHỈ
+    // ảnh hưởng hiển thị (offset dọc lúc vẽ), toạ độ va chạm/tấn công vẫn dùng x/y như cũ (xem ghi chú
+    // trong game-entities.js updateJumpFly để hiểu vì sao chọn cách này thay vì thêm hẳn 1 trục Y vật lý).
+    z: 0, vz: 0, jumping: false, flying: false, flyKiTimer: 0,
+    dashCd: 0, flyCd: 0,
+  },
   fx: [],               // hiệu ứng nổi tạm thời (damage numbers, hit flash)
   selectedClass: null,
   camera: { x: 0, y: 0 },
   keys: {},
+  auraPulseTimer: 0,     // đếm ngược tới lần phát "Tôn Sùng" tiếp theo (chỉ chạy khi char.hasAura)
+  auraDmgBuffUntil: 0,   // performance.now() timestamp còn hiệu lực +8% sát thương (mục pulse Aura)
+  nearbyAuraPulses: [],  // { userId, x, y, until } các "tiếng vang" Aura của người khác gần đây còn hiệu lực hiển thị
+  deathFx: [],            // { category, defId, x, y, dir, until } quái vừa chết — chơi animation death rồi tự biến mất
 };
 // GL.WORLD và GL.GROUND_Y được định nghĩa trong game-entities.js (mô hình hành lang ngang)
 
@@ -40,12 +52,15 @@ GL.mapById = (id) => GL.data.maps.find((m) => m.id === id);
 GL.continentById = (id) => GL.data.continents.find((c) => c.id === id);
 GL.classById = (id) => GL.data.classes[id];
 
-GL.toast = function (text, cls = '') {
+GL.toast = function (text, cls = '', iconName = '') {
   const wrap = document.getElementById('glFloatToast');
   if (!wrap) return;
   const el = document.createElement('div');
   el.className = 'gl-toast-item ' + cls;
-  el.textContent = text;
+  if (iconName) el.insertAdjacentHTML('beforeend', GL.icon(iconName)); // icon là chuỗi do dev viết, an toàn
+  const span = document.createElement('span');
+  span.textContent = text; // text có thể echo lại nội dung chat của người dùng -> luôn qua textContent, không dùng innerHTML
+  el.appendChild(span);
   wrap.appendChild(el);
   setTimeout(() => el.remove(), 1800);
 };

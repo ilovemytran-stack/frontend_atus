@@ -19,6 +19,22 @@ const Icon = (() => {
     motion: wrap('<path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/>'),
     atelier: wrap('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h13M21 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'),
     shop: wrap('<path d="M6 8V6a6 6 0 0 1 12 0v2"/><path d="M4 8h16l-1.2 12a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8L4 8Z"/>'),
+    x: wrap('<path d="M6 6l12 12M18 6L6 18"/>'),
+    wave: wrap('<path d="M7 12V6a2 2 0 0 1 4 0v4"/><path d="M11 10V4a2 2 0 0 1 4 0v6"/><path d="M15 10.5V6a2 2 0 0 1 4 0v8c0 4-3 7-7 7h-1c-2.5 0-4-1-5.5-3L3 13.5a1.7 1.7 0 0 1 2.6-2.1L7 13"/>'),
+    heart: wrap('<path d="M12 20s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.5-9.5 9-9.5 9z"/>'),
+    heartFilled: `<svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 20s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.5-9.5 9-9.5 9z"/></svg>`,
+    check: wrap('<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>'),
+    trash: wrap('<path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>'),
+    link: wrap('<path d="M9 15l6-6"/><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"/>'),
+    pin: wrap('<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.4"/>'),
+    calendar: wrap('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/>'),
+    pencil: wrap('<path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/>'),
+    mute: wrap('<path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M16 9l5 6M21 9l-5 6"/>'),
+    volume: wrap('<path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 6a9 9 0 0 1 0 12"/>'),
+    music: wrap('<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>'),
+    eye: wrap('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
+    coin: wrap('<circle cx="12" cy="12" r="8.5"/><path d="M9.5 14.5c.3 1 1.2 1.5 2.5 1.5s2.3-.7 2.3-1.7c0-1.1-1-1.4-2.3-1.7-1.4-.3-2.4-.7-2.4-1.8 0-1 1-1.6 2.2-1.6 1.2 0 2.1.5 2.4 1.4M12 8v1.2M12 14.8V16"/>'),
+    gem: wrap('<path d="M5 9l3-5h8l3 5-7 11z"/><path d="M5 9h14M9 4l1 5M15 4l-1 5M8 9l4 11 4-11"/>'),
   };
 })();
 
@@ -224,15 +240,15 @@ class Layout {
     wrap.className = 'ai-widget';
     wrap.innerHTML = `
       <button class="ai-toggle-btn" id="aiToggleBtn" aria-label="Mở trợ lý AI">${Icon.sparkle}</button>
-      <button class="ai-hide-btn" id="aiHideBtn" aria-label="Ẩn trợ lý AI" title="Ẩn">✕</button>
+      <button class="ai-hide-btn" id="aiHideBtn" aria-label="Ẩn trợ lý AI" title="Ẩn">${Icon.x}</button>
       <button class="ai-restore-btn" id="aiRestoreBtn" aria-label="Hiện trợ lý AI" title="Trợ lý AI">${Icon.sparkle}</button>
       <div class="ai-panel card" id="aiPanel" hidden>
         <div class="ai-panel-header">
           <span>${Icon.sparkle} Trợ lý G.Legendary</span>
-          <button class="btn btn-ghost btn-icon-sm" id="aiCloseBtn" aria-label="Đóng">✕</button>
+          <button class="btn btn-ghost btn-icon-sm" id="aiCloseBtn" aria-label="Đóng">${Icon.x}</button>
         </div>
         <div class="ai-messages" id="aiMessages">
-          <div class="ai-bubble ai-bubble-assistant">Chào bạn 👋 Hỏi mình về Public hoặc G.Legendary nhé — lớp nhân vật, map, boss, trang bị...</div>
+          <div class="ai-bubble ai-bubble-assistant">${Icon.wave} Chào bạn! Hỏi mình về Public hoặc G.Legendary nhé — lớp nhân vật, map, boss, trang bị...</div>
         </div>
         <form class="ai-form" id="aiForm">
           <input class="input" id="aiInput" placeholder="Nhập câu hỏi..." maxlength="2000" autocomplete="off">

@@ -8,7 +8,7 @@ GL.initWorldEventsSocket = function () {
   GL.socket.on('god_spawned', ({ continentId, name, color, hp, maxHp }) => {
     if (GL.map && GL.map.continentId === continentId && GL.map.role === 'god') {
       GL.worldGod = { continentId, name, color, hp, maxHp };
-      GL.toast(`✨ ${name} đã xuất hiện tại đây!`, 'gl-toast-levelup');
+      GL.toast(`${name} đã xuất hiện tại đây!`, 'gl-toast-levelup', 'sparkles');
     }
   });
   GL.socket.on('god_despawned', ({ continentId }) => {
@@ -20,30 +20,34 @@ GL.initWorldEventsSocket = function () {
   GL.socket.on('god_gift', ({ gold, gem, godName }) => {
     GL.char.gold += gold; GL.char.gem += gem;
     GL.updateCurrencyUI();
-    GL.toast(`🙏 ${godName} ban thưởng +${gold}🪙 +${gem}💎`);
+    GL.toast(`${godName} ban thưởng +${gold} Vàng +${gem} Ngọc`, '', 'hands');
   });
 
   GL.socket.on('boss_spawned', ({ mapId, form, hp, maxHp, singleFormMode }) => {
     if (GL.map && GL.map.id === mapId) {
       GL.worldBoss = { mapId, form, hp, maxHp, singleFormMode };
-      GL.toast('👑 CHAOSERAPH đã xuất hiện!', 'gl-toast-levelup');
+      GL.toast('CHAOSERAPH đã xuất hiện!', 'gl-toast-levelup', 'crown');
     }
   });
   GL.socket.on('boss_despawned', () => { if (GL.worldBoss) { GL.toast('Chaoseraph đã biến mất'); GL.worldBoss = null; } });
   GL.socket.on('boss_hp_update', ({ hp, maxHp }) => { if (GL.worldBoss) { GL.worldBoss.hp = hp; GL.worldBoss.maxHp = maxHp; if (GL.selectedTarget === GL.worldBoss) GL.updateTargetFrame(); } });
   GL.socket.on('boss_form_changed', ({ form, hp, maxHp }) => {
-    if (GL.worldBoss) { GL.worldBoss.form = form; GL.worldBoss.hp = hp; GL.worldBoss.maxHp = maxHp; GL.toast(`⚠️ Boss chuyển sang Dạng ${form}!`); }
+    if (GL.worldBoss) { GL.worldBoss.form = form; GL.worldBoss.hp = hp; GL.worldBoss.maxHp = maxHp; GL.toast(`Boss chuyển sang Dạng ${form}!`, '', 'warning'); }
   });
-  GL.socket.on('boss_killed', () => { GL.toast('💀 CHAOSERAPH ĐÃ BỊ HẠ GỤC!', 'gl-toast-levelup'); GL.worldBoss = null; });
-  GL.socket.on('boss_kill_reward', ({ vipCoin, drops }) => {
-    GL.toast(`Phần thưởng: +${vipCoin} Xu VIP, +1 Đá Nâng Cấp${drops.length ? ', +' + drops.length + ' trang bị đặc biệt!' : ''}`);
+  GL.socket.on('boss_killed', () => { GL.toast('CHAOSERAPH ĐÃ BỊ HẠ GỤC!', 'gl-toast-levelup', 'skull'); GL.worldBoss = null; });
+  GL.socket.on('boss_kill_reward', async ({ vipCoin, drops, petGained }) => {
+    GL.toast(`Phần thưởng: +${vipCoin} Xu VIP, +1 Đá Nâng Cấp${drops.length ? ', +' + drops.length + ' trang bị/pet quý!' : ''}`);
+    if (petGained) GL.toast(`Chúc mừng! Bạn nhận được pet: ${GL.data.pets[petGained]?.name || petGained}!`, 'gl-toast-levelup', 'paw');
+    await GL.fetchCharacter(); // đồng bộ lại inventory/pet mới nhận — trước đây không refetch nên drop không hiện ngay
+    GL.spawnPetsFromChar();
+    GL.updateVitalsUI(); GL.updateCurrencyUI();
   });
 
   // Thông báo boss TOÀN SERVER — biết cả khi không đứng đúng map
   GL.socket.on('world_boss_alert', (info) => {
     if (info.type === 'spawned') {
       GL.lastBossAlert = info;
-      GL.toast(`👑 Chaoseraph xuất hiện tại ${info.continentName} · ${info.mapName}!`, 'gl-toast-levelup');
+      GL.toast(`Chaoseraph xuất hiện tại ${info.continentName} · ${info.mapName}!`, 'gl-toast-levelup', 'crown');
       document.getElementById('glNotifDot').style.display = 'block';
     } else {
       GL.lastBossAlert = null;

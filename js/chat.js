@@ -29,7 +29,7 @@ function setupSocket() {
     }
     loadConversations(); // refresh list with new last message
     if (data.conversationId !== activeConversation?._id) {
-      Toast.info(`${data.message.sender?.displayName || 'Tin nhắn mới'}: ${data.message.content || '📷 Ảnh'}`);
+      Toast.info(`${data.message.sender?.displayName || 'Tin nhắn mới'}: ${data.message.content || 'Ảnh'}`);
     }
   });
 
@@ -46,7 +46,7 @@ function setupSocket() {
 
 function updatePartnerStatus(userId, online) {
   if (activePartner?._id === userId) {
-    document.getElementById('chatPartnerStatus').textContent = online ? '🟢 Đang hoạt động' : 'Ngoại tuyến';
+    document.getElementById('chatPartnerStatus').innerHTML = online ? '<span class="online-dot" style="display:inline-block;position:static;vertical-align:middle;margin-right:4px"></span>Đang hoạt động' : 'Ngoại tuyến';
   }
 }
 
@@ -93,7 +93,7 @@ async function openConversation(convId) {
 
   document.getElementById('chatPartnerAvatar').src = avatarURL(activePartner);
   document.getElementById('chatPartnerName').textContent = activePartner.displayName || activePartner.username;
-  document.getElementById('chatPartnerStatus').textContent = activePartner.isOnline ? '🟢 Đang hoạt động' : 'Ngoại tuyến';
+  document.getElementById('chatPartnerStatus').innerHTML = activePartner.isOnline ? '<span class="online-dot" style="display:inline-block;position:static;vertical-align:middle;margin-right:4px"></span>Đang hoạt động' : 'Ngoại tuyến';
 
   loadMessages(convId);
   loadConversations();

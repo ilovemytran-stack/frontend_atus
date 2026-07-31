@@ -51,23 +51,23 @@
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
   <main class="main-content">
     <header class="mobile-header">
-      <button class="btn btn-ghost btn-icon" id="menu-btn">☰</button>
+      <button class="btn btn-ghost btn-icon" id="menu-btn" aria-label="Menu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="mobile-header-logo">Admin</div>
       <div style="width:40px"></div>
     </header>
 <div class="admin-layout" id="adminContent" style="display:none">
   <div class="admin-header">
-    <h1 style="font-size:1.5rem;font-weight:800">⚙️ Admin Dashboard</h1>
-    <a href="feed.html" class="btn btn-secondary">← Về trang chủ</a>
+    <h1 style="font-size:1.5rem;font-weight:800;display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx=12 cy=12 r=3/><path d=M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z</svg> Admin Dashboard</h1>
+    <a href="feed.html" class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M19 12H5/><path d=M12 19l-7-7 7-7/></svg> Về trang chủ</a>
   </div>
   <div class="admin-stats" id="adminStats"></div>
 
   <div class="admin-tabs">
-    <div class="admin-tab active" data-tab="users">👥 Người dùng</div>
-    <div class="admin-tab" data-tab="posts">📝 Bài viết</div>
-    <div class="admin-tab" data-tab="videos">🎬 Video</div>
-    <div class="admin-tab" data-tab="gmgame">🎮 GM Game</div>
-    <div class="admin-tab" data-tab="announcements">📢 Thông Báo</div>
+    <div class="admin-tab active" data-tab="users"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2/><circle cx=9 cy=7 r=4/><path d=M23 21v-2a4 4 0 0 0-3-3.87/><path d=M16 3.13a4 4 0 0 1 0 7.75/></svg> Người dùng</div>
+    <div class="admin-tab" data-tab="posts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M4 20l1-4L16 5l3 3L8 19l-4 1z/><path d=M14 7l3 3/></svg> Bài viết</div>
+    <div class="admin-tab" data-tab="videos"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x=2 y=5 width=15 height=14 rx=2/><path d=M17 10l5-3v10l-5-3z/></svg> Video</div>
+    <div class="admin-tab" data-tab="gmgame"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x=2 y=7 width=20 height=12 rx=3/><path d=M7 12h.01M5 10v4/><path d=M4 12h2/><circle cx=16 cy=11 r=1/><circle cx=18 cy=13 r=1/></svg> GM Game</div>
+    <div class="admin-tab" data-tab="announcements"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M3 11l18-5v12L3 14v-3z/><path d=M11.6 16.8L13 21l3-1-1.4-4.2/></svg> Thông Báo</div>
   </div>
 
   <div class="admin-toolbar">
@@ -136,7 +136,7 @@
   </div>
 </div>
 <div id="accessDenied" class="access-denied" style="display:none">
-  <div style="font-size:48px;margin-bottom:16px">🚫</div>
+  <div style="margin-bottom:16px"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></svg></div>
   <h2>Không có quyền truy cập</h2>
   <p style="color:var(--text-muted);margin-top:8px">Trang này chỉ dành cho quản trị viên. Nếu bạn vừa được cấp quyền admin, hãy đăng xuất rồi đăng nhập lại.</p>
   <a href="feed.html" class="btn btn-primary" style="margin-top:20px;display:inline-flex">Về trang chủ</a>
@@ -351,7 +351,7 @@ async function loadGmChars() {
       <td>@${esc(c.user?.username || '?')}</td>
       <td>${esc(c.classId)}</td>
       <td>${c.level}</td>
-      <td>${(c.gold||0).toLocaleString()}🪙 / ${(c.gem||0).toLocaleString()}💎</td>
+      <td>${(c.gold||0).toLocaleString()} Vàng / ${(c.gem||0).toLocaleString()} Ngọc</td>
       <td>${c.gmDamageMultiplier && c.gmDamageMultiplier !== 1 ? `x${c.gmDamageMultiplier}` : '—'}</td>
       <td><div class="admin-actions">
         <button class="btn btn-sm btn-secondary" onclick="gmSetLevel('${c._id}','${esc(c.name)}',${c.level})">Cấp</button>

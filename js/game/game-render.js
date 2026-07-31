@@ -82,6 +82,84 @@ function drawSprite(sx, sy, imgUrl, opts) {
   return true;
 }
 
+// Khác drawSprite (luôn crop vuông từ giữa, hợp với portrait 512x512): pet dùng ảnh đã cắt sát viền
+// trong suốt với tỉ lệ khung hình khác nhau tuỳ frame, nên giữ NGUYÊN tỉ lệ gốc thay vì crop vuông.
+function drawPetFrame(sx, sy, imgUrl, opts) {
+  const { dir = 1, heightPx = 46, alpha = 1 } = opts || {};
+  if (!imgUrl) return false;
+  const img = getPortraitImg(imgUrl);
+  if (!img || !img.complete || !img.naturalWidth) return false;
+  const h = heightPx * DPR;
+  const w = h * (img.naturalWidth / img.naturalHeight);
+  const drawY = sy - h + 6 * DPR;
+
+  ctx.beginPath();
+  ctx.ellipse(sx, sy + 2 * DPR, w * 0.32, 4 * DPR, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(sx, 0);
+  ctx.scale(dir < 0 ? -1 : 1, 1);
+  ctx.drawImage(img, -w / 2, drawY, w, h);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+  return true;
+}
+
+// ============================================================================
+// Engine animation nhiều-frame thật (thay cho "1 ảnh tĩnh + bob") — đọc từ GL.data.spriteManifest
+// (server trả về từ backend/data/spriteManifest.json, sinh ra bằng cách phân tích GLG). Mỗi entity có
+// tối đa 7 "clip": idle, walk, combat1..4, death — xem build_sprite_engine_assets.py để biết quy ước
+// suy ra tên clip từ thứ tự row (đã kiểm chứng bằng phân tích chiều cao bbox qua nhiều nhân vật/quái/thần).
+// ============================================================================
+GL.SPRITE_FPS = 9;
+
+function spriteManifestFor(category, entityId) {
+  return GL.data.spriteManifest?.[category]?.[entityId] || null;
+}
+
+function pickClip(manifest, wanted) {
+  if (manifest[wanted]) return wanted;
+  if (wanted.startsWith('combat')) return manifest.combat1 ? 'combat1' : (manifest.idle ? 'idle' : Object.keys(manifest)[0]);
+  return manifest.idle ? 'idle' : Object.keys(manifest)[0];
+}
+
+// holder = entity bất kỳ (player/monster/npc/worldGod/worldBoss) — tự gắn .anim vào entity đó (lazy init).
+// idle/walk LẶP vòng; combat/death chỉ chạy 1 lần rồi giữ nguyên frame cuối chờ đổi clip (death: giữ mãi).
+function stepAnim(holder, manifest, wantedClip, dt) {
+  if (!holder.anim) holder.anim = { clip: 'idle', frame: 1, timer: 0, playedOnce: false };
+  const a = holder.anim;
+  const resolved = pickClip(manifest, wantedClip);
+  const looping = resolved === 'idle' || resolved === 'walk';
+  if (a.clip !== resolved && (looping || a.playedOnce || resolved === 'death')) {
+    a.clip = resolved; a.frame = 1; a.timer = 0; a.playedOnce = false;
+  }
+  const total = manifest[a.clip] || 1;
+  if (a.clip === 'death' && a.frame >= total) return a; // đứng khựng ở frame cuối cùng mãi mãi
+  a.timer += dt || 0.016;
+  const frameDur = 1 / GL.SPRITE_FPS;
+  while (a.timer >= frameDur) {
+    a.timer -= frameDur;
+    a.frame += 1;
+    if (a.frame > total) {
+      if (looping) a.frame = 1;
+      else { a.playedOnce = true; a.frame = total; }
+    }
+  }
+  return a;
+}
+
+// Vẽ entity bằng animation thật nếu có manifest cho entityId này; trả về false nếu KHÔNG có để nơi gọi
+// tự fallback (ảnh tĩnh cũ / hình vector) — không phá vỡ các entity chưa có sprite (an toàn khi thiếu asset).
+function drawAnimated(sx, sy, category, entityId, wantedClip, holder, dt, opts) {
+  if (!entityId) return false;
+  const manifest = spriteManifestFor(category, entityId);
+  if (!manifest) return false;
+  const a = stepAnim(holder, manifest, wantedClip, dt);
+  return drawPetFrame(sx, sy, `/assets/game/sprites/${category}/${entityId}/${a.clip}/${a.frame}.png`, opts);
+}
+
 function hashSeed(str) {
   let h = 1779033703;
   for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
@@ -294,13 +372,19 @@ function roundRect(x, y, w, h, r) {
   ctx.closePath();
 }
 
-function drawMonster(m, t) {
+function drawMonster(m, t, dt) {
   if (!m.alive) return;
   const { sx, sy } = worldToScreen(m.x, m.y);
   if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) return;
   const shapeColor = m.def.color;
-  const spriteUrl = `/assets/game/${m.isBoss ? 'bosses' : 'monsters'}/${m.defId}.png`;
-  const gotSprite = drawSprite(sx, sy, spriteUrl, { dir: m.dir, moving: m.state === 'chase', t, heightPx: m.isBoss ? 70 : 52, isBoss: m.isBoss });
+  const category = m.isBoss ? 'bosses' : 'monsters';
+  const wantedClip = m.state === 'chase' ? 'walk' : (m.state === 'attack' ? 'combat1' : 'idle');
+  const heightPx = m.isBoss ? 76 : 54;
+  let gotSprite = drawAnimated(sx, sy, category, m.defId, wantedClip, m, dt, { dir: m.dir, heightPx });
+  if (!gotSprite) {
+    const spriteUrl = `/assets/game/${category}/${m.defId}.png`;
+    gotSprite = drawSprite(sx, sy, spriteUrl, { dir: m.dir, moving: m.state === 'chase', t, heightPx: m.isBoss ? 70 : 52, isBoss: m.isBoss });
+  }
   if (!gotSprite) {
     drawHumanoid(sx, sy, { color: shapeColor, dir: m.dir, moving: m.state === 'chase', t, scale: m.isBoss ? 1.6 : 1, weaponType: m.def.shape === 'caster' ? 'staff' : (m.def.shape === 'archer' ? 'dagger' : 'sword') });
   }
@@ -308,88 +392,259 @@ function drawMonster(m, t) {
   drawHpBar(sx, sy - topOff * DPR, m.isBoss ? 60 : 34, m.hp / m.maxHp, '#E85C4C');
   ctx.fillStyle = m.isBoss ? '#F5B84C' : '#e8e2d0';
   ctx.font = `${(m.isBoss ? 12 : 10) * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
-  ctx.fillText((m.isBoss ? '★ ' : '') + m.def.nameVN, sx, sy - (topOff - 18) * DPR);
+  const nameY = sy - (topOff - 18) * DPR;
+  if (m.isBoss) {
+    const textW = ctx.measureText(m.def.nameVN).width;
+    const starGap = 14 * DPR;
+    ctx.save(); ctx.translate(sx - textW / 2 - starGap / 2, nameY - 3 * DPR); drawVectorGlyph('star', 9 * DPR, '#F5B84C'); ctx.restore();
+    ctx.textAlign = 'left'; ctx.fillText(m.def.nameVN, sx - textW / 2 + starGap / 2, nameY); ctx.textAlign = 'center';
+  } else {
+    ctx.fillText(m.def.nameVN, sx, nameY);
+  }
 }
 
-function drawSummon(s, t) {
+function drawSummon(s, t, dt) {
   if (!s.alive) return;
   const { sx, sy } = worldToScreen(s.x, s.y);
-  const gotSprite = drawSprite(sx, sy, s.def.portrait, { dir: s.dir, moving: s.state === 'chase', t, heightPx: 60 });
+  const wantedClip = s.state === 'chase' ? 'walk' : (s.state === 'attack' ? 'combat1' : 'idle');
+  let gotSprite = drawAnimated(sx, sy, 'summons', s.def.id, wantedClip, s, dt, { dir: s.dir, heightPx: 62 });
+  if (!gotSprite) gotSprite = drawSprite(sx, sy, s.def.portrait, { dir: s.dir, moving: s.state === 'chase', t, heightPx: 60 });
   if (!gotSprite) drawHumanoid(sx, sy, { color: s.def.color, dir: s.dir, moving: s.state === 'chase', t, attacking: s.state === 'attack', weaponType: s.def.weaponType });
   drawHpBar(sx, sy - (gotSprite ? 78 : 34) * DPR, 30, s.hp / s.maxHp, '#5CE8A0');
   ctx.fillStyle = '#9CFFD0'; ctx.font = `${9 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
   ctx.fillText(s.def.nameVN, sx, sy - (gotSprite ? 86 : 42) * DPR);
 }
 
-function drawNpc(npc) {
+const PET_MODE_LABEL = { def: 'Thủ', atk: 'Công', fl: 'Theo' };
+const PET_MODE_COLOR = { def: '#5CA8E8', atk: '#E85C5C', fl: '#9CFF9C' };
+
+// Pet: cycle qua các frame (1..frameCount) tạo cảm giác sống động thay vì đứng yên hoàn toàn, hiện
+// Die.png mờ dần khi đang chờ hồi sinh, có nhãn chế độ (Thủ/Công/Theo) nhỏ phía trên đầu.
+function drawPet(pet, t) {
+  const { sx, sy } = worldToScreen(pet.x, pet.y);
+  if (sx < -60 || sy < -60 || sx > canvas.width + 60 || sy > canvas.height + 60) return;
+  let gotSprite;
+  if (pet.isDead) {
+    gotSprite = drawPetFrame(sx, sy, pet.defObj?.diePortrait, { dir: pet.dir, heightPx: 40, alpha: 0.55 });
+    const secsLeft = Math.max(0, Math.round((pet.deadUntil - performance.now()) / 1000));
+    ctx.fillStyle = '#ff8a8a'; ctx.font = `${9 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText(`Hồi sinh ${secsLeft}s`, sx, sy - (gotSprite ? 54 : 30) * DPR);
+    return;
+  }
+  const frameCount = pet.defObj?.frameCount || 26;
+  const frameIdx = 1 + Math.floor(pet.frameT * 7) % frameCount;
+  gotSprite = drawPetFrame(sx, sy, `/assets/game/pets/${pet.defId}/${frameIdx}.png`, { dir: pet.dir, heightPx: 46 });
+  if (!gotSprite) drawHumanoid(sx, sy, { color: pet.defObj?.tier === 'vip' ? '#F5B84C' : '#8FCFE8', dir: pet.dir, moving: pet.state === 'chase', t, scale: 0.7, attacking: pet.state === 'attack' });
+  const topOff = (gotSprite ? 62 : 30) * DPR;
+  drawHpBar(sx, sy - topOff, 26, pet.hp / pet.maxHp, pet.defObj?.tier === 'vip' ? '#F5B84C' : '#5CA8E8');
+  ctx.fillStyle = PET_MODE_COLOR[pet.mode] || '#cfd6ff'; ctx.font = `${8.5 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
+  ctx.fillText(`${pet.defObj?.name || 'Pet'} · ${PET_MODE_LABEL[pet.mode] || ''}`, sx, sy - topOff - 8 * DPR);
+}
+
+// Tiểu Quái đồng hành (Chiêu 4 của pet) — bay quanh pet chủ, chỉ mang tính hình ảnh (không có hộp va chạm riêng)
+function drawPetMiniMonster(pet, t) {
+  const orbit = 20 * DPR;
+  const { sx, sy } = worldToScreen(pet.x, pet.y);
+  const ox = sx + Math.cos(t * 3 + pet.slot * 2) * orbit;
+  const oy = sy - 34 * DPR + Math.sin(t * 3 + pet.slot * 2) * (orbit * 0.5);
+  const frame = 1 + Math.floor(t * 6) % 3;
+  drawPetFrame(ox, oy, `/assets/game/pet-skills/skill4/mini_monster/${frame}.png`, { dir: 1, heightPx: 20 });
+}
+
+// Hào Quang (Aura): vòng hào quang xoay quanh nhân vật đang sở hữu — cycle 12 frame liên tục
+function drawAuraGlow(sx, sy, t) {
+  const frame = 1 + Math.floor(t * 10) % 12;
+  const img = getPortraitImg(`/assets/game/aura/${frame}.png`);
+  if (!img || !img.complete || !img.naturalWidth) return;
+  const h = 92 * DPR, w = h * (img.naturalWidth / img.naturalHeight);
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(img, sx - w / 2, sy - h * 0.62, w, h);
+  ctx.restore();
+}
+
+// Vẽ icon vector đơn giản lên canvas (thay glyph emoji) — canvas fillText() không thể render
+// <svg><use>, nên các icon dùng trong world (NPC fallback, sao boss, vương miện, phước lành) được
+// vẽ lại bằng path canvas, cùng tinh thần với bộ SVG line-icon dùng ở phần UI/HTML của trang.
+function drawVectorGlyph(key, size, color) {
+  const s = size; ctx.save();
+  ctx.strokeStyle = color || '#F5D061'; ctx.fillStyle = color || '#F5D061';
+  ctx.lineWidth = Math.max(1, s * 0.11); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (key === 'scroll') {
+    ctx.strokeRect(-s * 0.32, -s * 0.42, s * 0.64, s * 0.84);
+    ctx.beginPath(); ctx.moveTo(-s * 0.18, -s * 0.16); ctx.lineTo(s * 0.18, -s * 0.16);
+    ctx.moveTo(-s * 0.18, s * 0.08); ctx.lineTo(s * 0.05, s * 0.08); ctx.stroke();
+  } else if (key === 'portal') {
+    ctx.beginPath(); ctx.ellipse(0, 0, s * 0.42, s * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, s * 0.2, s * 0.42, 0, 0, Math.PI * 2); ctx.stroke();
+  } else if (key === 'flask') {
+    ctx.beginPath(); ctx.moveTo(-s * 0.14, -s * 0.4); ctx.lineTo(s * 0.14, -s * 0.4);
+    ctx.moveTo(-s * 0.1, -s * 0.4); ctx.lineTo(-s * 0.1, -s * 0.05); ctx.lineTo(-s * 0.32, s * 0.32);
+    ctx.arc(0, s * 0.32, s * 0.32, Math.PI, 0); ctx.lineTo(s * 0.1, -s * 0.05); ctx.lineTo(s * 0.1, -s * 0.4); ctx.stroke();
+  } else if (key === 'sword') {
+    ctx.beginPath(); ctx.moveTo(-s * 0.32, s * 0.4); ctx.lineTo(s * 0.32, -s * 0.4);
+    ctx.moveTo(-s * 0.32, s * 0.02); ctx.lineTo(-s * 0.02, s * 0.32); ctx.stroke();
+  } else if (key === 'shield') {
+    ctx.beginPath(); ctx.moveTo(0, -s * 0.42); ctx.lineTo(s * 0.36, -s * 0.24); ctx.lineTo(s * 0.36, s * 0.06);
+    ctx.quadraticCurveTo(s * 0.36, s * 0.36, 0, s * 0.46);
+    ctx.quadraticCurveTo(-s * 0.36, s * 0.36, -s * 0.36, s * 0.06); ctx.lineTo(-s * 0.36, -s * 0.24); ctx.closePath(); ctx.stroke();
+  } else if (key === 'star') {
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = (-Math.PI / 2) + i * (2 * Math.PI / 5);
+      const a2 = a + Math.PI / 5;
+      const x1 = Math.cos(a) * s * 0.44, y1 = Math.sin(a) * s * 0.44;
+      const x2 = Math.cos(a2) * s * 0.18, y2 = Math.sin(a2) * s * 0.18;
+      if (i === 0) ctx.moveTo(x1, y1); else ctx.lineTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    }
+    ctx.closePath(); ctx.fill();
+  } else if (key === 'crown') {
+    ctx.beginPath(); ctx.moveTo(-s * 0.4, s * 0.28); ctx.lineTo(-s * 0.28, -s * 0.14); ctx.lineTo(-s * 0.1, s * 0.02);
+    ctx.lineTo(0, -s * 0.32); ctx.lineTo(s * 0.1, s * 0.02); ctx.lineTo(s * 0.28, -s * 0.14); ctx.lineTo(s * 0.4, s * 0.28);
+    ctx.closePath(); ctx.fill();
+  } else if (key === 'hands') {
+    ctx.beginPath(); ctx.moveTo(0, -s * 0.4); ctx.lineTo(0, s * 0.4);
+    ctx.moveTo(0, s * 0.06); ctx.quadraticCurveTo(-s * 0.3, s * 0.28, -s * 0.42, -s * 0.02);
+    ctx.moveTo(0, s * 0.06); ctx.quadraticCurveTo(s * 0.3, s * 0.28, s * 0.42, -s * 0.02); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawNpc(npc, dt) {
   const { sx, sy } = worldToScreen(npc.x, npc.y);
-  const gotSprite = drawSprite(sx, sy, `/assets/game/npc/${GL.map?.continentId || 'aurelion'}/${npc.id}.png`, { dir: 1, moving: false, t: performance.now() / 1000, heightPx: 58 });
+  const entityId = `${GL.map?.continentId || 'aurelion'}_${npc.id}`;
+  let gotSprite = drawAnimated(sx, sy, 'npc', entityId, 'idle', npc, dt, { dir: 1, heightPx: 58 });
+  if (!gotSprite) gotSprite = drawSprite(sx, sy, `/assets/game/npc/${GL.map?.continentId || 'aurelion'}/${npc.id}.png`, { dir: 1, moving: false, t: performance.now() / 1000, heightPx: 58 });
   if (!gotSprite) {
     ctx.save(); ctx.translate(sx, sy);
     ctx.beginPath(); ctx.arc(0, 0, 16 * DPR, 0, 7);
     ctx.fillStyle = 'rgba(245,208,97,.16)'; ctx.fill();
     ctx.strokeStyle = '#F5D061'; ctx.lineWidth = 2 * DPR; ctx.stroke();
-    ctx.font = `${16 * DPR}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(npc.icon, 0, 1);
+    drawVectorGlyph(npc.icon, 15 * DPR, '#F5D061');
     ctx.restore();
   }
   ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.fillStyle = '#F5D061'; ctx.textAlign = 'center';
   ctx.fillText(npc.name, sx, sy - (gotSprite ? 66 : 26) * DPR);
 }
 
-function drawWorldBossAndGod() {
+function drawWorldBossAndGod(dt) {
   if (GL.worldGod) {
     const { sx, sy } = worldToScreen(GL.GOD_SPOT.x, GL.GOD_SPOT.y);
     ctx.save(); ctx.shadowColor = GL.worldGod.color; ctx.shadowBlur = 20 * DPR;
     ctx.beginPath(); ctx.arc(sx, sy, 26 * DPR, 0, 7);
     ctx.fillStyle = GL.worldGod.color; ctx.globalAlpha = 0.25; ctx.fill(); ctx.globalAlpha = 1;
     ctx.restore();
-    const gotArt = drawSprite(sx, sy, `/assets/game/gods/${GL.worldGod.continentId || GL.map?.continentId}.png`, { dir: 1, moving: false, t: performance.now() / 1000, heightPx: 78 });
-    if (!gotArt) { ctx.font = `${13 * DPR}px serif`; ctx.textAlign = 'center'; ctx.fillText('🙏', sx, sy + 5 * DPR); }
+    const godContId = GL.worldGod.continentId || GL.map?.continentId;
+    let gotArt = drawAnimated(sx, sy, 'gods', godContId, 'idle', GL.worldGod, dt, { dir: 1, heightPx: 82 });
+    if (!gotArt) gotArt = drawSprite(sx, sy, `/assets/game/gods/${godContId}.png`, { dir: 1, moving: false, t: performance.now() / 1000, heightPx: 78 });
+    if (!gotArt) { ctx.save(); ctx.translate(sx, sy + 5 * DPR); drawVectorGlyph('hands', 22 * DPR, GL.worldGod.color || '#fff'); ctx.restore(); }
     ctx.fillStyle = '#fff'; ctx.font = `${11 * DPR}px Cinzel, serif`; ctx.textAlign = 'center';
     ctx.fillText(GL.worldGod.name, sx, sy - (gotArt ? 92 : 38) * DPR);
     drawHpBar(sx, sy - (gotArt ? 84 : 30) * DPR, 50, GL.worldGod.hp / GL.worldGod.maxHp, GL.worldGod.color);
   }
   if (GL.worldBoss) {
     const { sx, sy } = worldToScreen(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y);
-    // Boss Thế Giới = Chaoseraph (Thần Hỗn Mang), đổi tạo hình theo Dạng 1-5 khi càng mất máu càng biến hình mạnh hơn
-    const chaosArt = `chaoseraph_${GL.worldBoss.form}`;
+    // Boss Thế Giới = Chaoseraph/ChaosLord (Thần Hỗn Mang), đổi tạo hình theo Dạng 1-5 khi càng mất máu càng biến hình mạnh hơn
+    const chaosEntityId = `b_chaoseraph_form${GL.worldBoss.form}`;
     ctx.save(); ctx.shadowColor = '#E85C4C'; ctx.shadowBlur = 26 * DPR;
-    const gotBoss = drawSprite(sx, sy, `/assets/game/bosses/${chaosArt}.png`, { dir: -1, moving: true, t: performance.now() / 1000, heightPx: 92, isBoss: true });
+    let gotBoss = drawAnimated(sx, sy, 'bosses', chaosEntityId, 'idle', GL.worldBoss, dt, { dir: -1, heightPx: 96 });
+    if (!gotBoss) gotBoss = drawSprite(sx, sy, `/assets/game/bosses/chaoseraph_${GL.worldBoss.form}.png`, { dir: -1, moving: true, t: performance.now() / 1000, heightPx: 92, isBoss: true });
     if (!gotBoss) drawHumanoid(sx, sy, { color: '#8A1F1F', dir: -1, moving: false, t: performance.now() / 1000, scale: 2.1, weaponType: 'sword' });
     ctx.restore();
     ctx.fillStyle = '#F5B84C'; ctx.font = `${13 * DPR}px Cinzel, serif`; ctx.textAlign = 'center';
-    ctx.fillText(`👑 CHAOSERAPH · Dạng ${GL.worldBoss.form}/5`, sx, sy - (gotBoss ? 158 : 74) * DPR);
+    { const label = `CHAOSERAPH · Dạng ${GL.worldBoss.form}/5`;
+      const textW = ctx.measureText(label).width; const gap = 16 * DPR;
+      const nameY = sy - (gotBoss ? 158 : 74) * DPR;
+      ctx.save(); ctx.translate(sx - textW / 2 - gap / 2, nameY - 4 * DPR); drawVectorGlyph('crown', 13 * DPR, '#F5B84C'); ctx.restore();
+      ctx.textAlign = 'left'; ctx.fillText(label, sx - textW / 2 + gap / 2, nameY); ctx.textAlign = 'center'; }
     drawHpBar(sx, sy - (gotBoss ? 148 : 64) * DPR, 90, GL.worldBoss.hp / GL.worldBoss.maxHp, '#E85C4C');
   }
 }
 
-GL.renderFrame = function (t) {
+// Bong bóng chat trên đầu nhân vật: tự mất sau GL.CHAT_BUBBLE_MS (5s, xem game-ui.js).
+// nameY = toạ độ Y (canvas, đã *DPR) của dòng tên đang vẽ — bong bóng nằm ngay phía trên đó.
+function drawChatBubble(entity, sx, nameY) {
+  const bub = entity?.chatBubble;
+  if (!bub) return;
+  if (performance.now() > bub.until) { entity.chatBubble = null; return; }
+  let text = bub.text;
+  if (text.length > 42) text = text.slice(0, 41) + '…'; // giới hạn độ dài hiển thị trong bong bóng
+  ctx.font = `${11 * DPR}px Inter, sans-serif`;
+  const padX = 9 * DPR, padY = 6 * DPR;
+  const w = Math.min(ctx.measureText(text).width + padX * 2, 220 * DPR);
+  const h = 15 * DPR + padY * 2;
+  const bx = sx - w / 2, by = nameY - h - 8 * DPR;
+  const r = 8 * DPR;
+  ctx.beginPath();
+  ctx.moveTo(bx + r, by);
+  ctx.arcTo(bx + w, by, bx + w, by + h, r);
+  ctx.arcTo(bx + w, by + h, bx, by + h, r);
+  ctx.arcTo(bx, by + h, bx, by, r);
+  ctx.arcTo(bx, by, bx + w, by, r);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(18,16,28,.88)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 1 * DPR; ctx.stroke();
+  // đuôi bong bóng chỉ xuống đầu nhân vật
+  ctx.beginPath();
+  ctx.moveTo(sx - 5 * DPR, by + h);
+  ctx.lineTo(sx + 5 * DPR, by + h);
+  ctx.lineTo(sx, by + h + 6 * DPR);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(18,16,28,.88)'; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, sx, by + h / 2 + 1 * DPR);
+  ctx.textBaseline = 'alphabetic';
+}
+
+GL.renderFrame = function (t, dt) {
   if (!canvas) return;
   drawGround();
   drawMapProps(GL.map);
-  drawWorldBossAndGod();
+  drawWorldBossAndGod(dt);
 
-  if (GL.map?.role === 'hub') GL.NPC_DEFS.forEach(drawNpc);
+  if (GL.map?.role === 'hub') GL.NPC_DEFS.forEach((npc) => drawNpc(npc, dt));
 
   Object.values(GL.remote).forEach((r) => {
     const { sx, sy } = worldToScreen(r.x, r.y);
     const cls = GL.classById(r.classId);
-    const gotSprite = drawSprite(sx, sy, cls?.portrait, { dir: r.dir || 1, moving: r.moving, t });
+    let gotSprite = drawAnimated(sx, sy, 'characters', cls?.id, r.moving ? 'walk' : 'idle', r, dt, { dir: r.dir || 1, heightPx: 80 });
+    if (!gotSprite) gotSprite = drawSprite(sx, sy, cls?.portrait, { dir: r.dir || 1, moving: r.moving, t });
     if (!gotSprite) drawHumanoid(sx, sy, { color: cls?.color || '#8888ff', dir: r.dir || 1, moving: r.moving, t, weaponType: cls?.weaponType });
+    const nameY = sy - (gotSprite ? 80 : 34) * DPR;
     ctx.fillStyle = '#cfd6ff'; ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
-    ctx.fillText(`${r.name} Lv.${r.level || 1}`, sx, sy - (gotSprite ? 80 : 34) * DPR);
+    ctx.fillText(`${r.name} Lv.${r.level || 1}`, sx, nameY);
+    drawChatBubble(r, sx, nameY);
   });
 
-  GL.monsters.forEach((m) => drawMonster(m, t));
-  (GL.summons || []).forEach((s) => drawSummon(s, t));
+  GL.monsters.forEach((m) => drawMonster(m, t, dt));
+  GL.deathFx = (GL.deathFx || []).filter((fx) => performance.now() < fx.until);
+  GL.deathFx.forEach((fx) => {
+    const { sx, sy } = worldToScreen(fx.x, fx.y);
+    drawAnimated(sx, sy, fx.category, fx.defId, 'death', fx, dt, { dir: fx.dir, heightPx: fx.isBoss ? 76 : 54 });
+  });
+  (GL.summons || []).forEach((s) => drawSummon(s, t, dt));
+  (GL.pets || []).forEach((pet) => drawPet(pet, t));
+  (GL.petMiniMonsters || []).forEach((pet) => drawPetMiniMonster(pet, t));
 
   const p = GL.player, { sx, sy } = worldToScreen(p.x, p.y);
+  const zOff = (p.z || 0) * DPR; // nhảy/bay: CHỈ dịch lên khi vẽ, không đổi toạ độ logic (xem game-controls.js updateJumpFly)
+  const syDraw = sy - zOff;
   const cls = GL.classById(GL.char.classId);
-  const gotSprite = drawSprite(sx, sy, cls.portrait, { dir: p.dir, moving: p.moving, t, heightPx: 80 });
-  if (!gotSprite) drawHumanoid(sx, sy, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
+  if (GL.char.stats?.hasAura) drawAuraGlow(sx, syDraw, t);
+  const wantedClip = performance.now() < (p.actionUntil || 0) ? p.actionClip : (p.moving ? 'walk' : 'idle');
+  let gotSprite = drawAnimated(sx, syDraw, 'characters', cls.id, wantedClip, p, dt, { dir: p.dir, heightPx: 80 });
+  if (!gotSprite) gotSprite = drawSprite(sx, syDraw, cls.portrait, { dir: p.dir, moving: p.moving, t, heightPx: 80 });
+  if (!gotSprite) drawHumanoid(sx, syDraw, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
+  if (p.z > 2) { // bóng đổ dưới đất khi đang nhảy/bay lên cao, giúp thấy rõ đang rời mặt đất
+    ctx.beginPath(); ctx.ellipse(sx, sy + 3 * DPR, 20 * DPR * Math.max(0.4, 1 - p.z / 90), 4.5 * DPR, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fill();
+  }
+  const pNameY = syDraw - (gotSprite ? 88 : 34) * DPR;
   ctx.fillStyle = '#fff'; ctx.font = `${10 * DPR}px Inter, sans-serif`; ctx.textAlign = 'center';
-  ctx.fillText(GL.char.name, sx, sy - (gotSprite ? 88 : 34) * DPR);
+  ctx.fillText(GL.char.name, sx, pNameY);
+  drawChatBubble(p, sx, pNameY);
 
   // fx sát thương nổi
   GL.fx = GL.fx.filter((f) => f.t < f.life);

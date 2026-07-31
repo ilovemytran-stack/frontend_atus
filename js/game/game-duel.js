@@ -3,10 +3,13 @@
 // ============================================================================
 GL.duel = null; // { tier, continentId, god:{...}, godHp, godMaxHp, playerHp, playerMaxHp, timer }
 
-function duelLog(text) {
+function duelLog(text, iconName = '') {
   const log = document.getElementById('glDuelLog');
   const line = document.createElement('div');
-  line.textContent = text;
+  if (iconName) line.insertAdjacentHTML('beforeend', GL.icon(iconName));
+  const span = document.createElement('span');
+  span.textContent = text;
+  line.appendChild(span);
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
   while (log.children.length > 40) log.removeChild(log.firstChild);
@@ -28,7 +31,7 @@ GL.startGodDuel = async function (tier) {
   document.getElementById('glDuelPlayerName').textContent = GL.char.name;
   document.getElementById('glDuelPlayerPortrait').style.backgroundImage = `url(${cls.portrait})`;
   document.getElementById('glDuelLog').innerHTML = '';
-  duelLog(`⚔️ Trận đấu với ${res.god.name} bắt đầu!`);
+  duelLog(`Trận đấu với ${res.god.name} bắt đầu!`, 'sword');
   updateDuelBars();
   closePanelG('glPanelNotif');
   openPanelG('glPanelDuel');
@@ -67,7 +70,8 @@ async function endDuel(won) {
   const d = GL.duel; if (!d || d.over) return;
   d.over = true;
   clearInterval(d.godTimer);
-  duelLog(won ? `🎉 Bạn đã chiến thắng ${d.god.name}!` : `💀 Bạn đã gục ngã trước ${d.god.name}...`);
+  if (won) duelLog(`Bạn đã chiến thắng ${d.god.name}!`, 'trophy');
+  else duelLog(`Bạn đã gục ngã trước ${d.god.name}...`, 'skull');
   const res = await API.post('/game/character/duel/resolve', { tier: d.tier, won });
   if (res?.success) {
     if (won) { GL.char = res.character; GL.updateVitalsUI(); }

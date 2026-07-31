@@ -18,6 +18,8 @@ GL.updateVitalsUI = function () {
   const cls = GL.classById(GL.char.classId);
   portrait.style.backgroundImage = `url(${cls.portrait})`;
   portrait.style.borderColor = cls.color;
+  const petBtn = document.getElementById('glBtnPet');
+  if (petBtn) petBtn.style.display = (GL.char.pets || []).length ? 'flex' : 'none';
 };
 
 GL.updateSkillButtonsUI = function () {
@@ -43,7 +45,9 @@ GL.updateTargetFrame = function () {
   frame.style.display = 'block';
   const name = t.def?.nameVN || t.name || (t === GL.worldBoss ? 'Chaoseraph' : '???');
   const hp = t.hp, maxHp = t.maxHp;
-  document.getElementById('glTargetName').textContent = `${name}${GL.autoAttackTarget === t ? ' ⚔️' : ''}`;
+  const nameEl = document.getElementById('glTargetName');
+  nameEl.textContent = name;
+  if (GL.autoAttackTarget === t) nameEl.insertAdjacentHTML('beforeend', ' ' + GL.icon('sword', 'gl-icon-sm'));
   document.getElementById('glTargetHpFill').style.width = Math.max(0, (hp / maxHp) * 100) + '%';
 };
 
@@ -52,12 +56,22 @@ GL.updateCurrencyUI = function () {
   document.getElementById('glGem').textContent = GL.char.gem;
 };
 
-GL.appendChat = function (name, text) {
+GL.CHAT_BUBBLE_MS = 5000;
+GL.appendChat = function (userId, name, text) {
   const log = document.getElementById('glChatLog');
   const line = document.createElement('div');
   line.innerHTML = `<b>${name}:</b> ${text.replace(/</g, '&lt;')}`;
   log.appendChild(line);
   while (log.children.length > 6) log.removeChild(log.firstChild);
+  GL.setChatBubble(userId, text);
+};
+
+// Bong bóng chat trên đầu nhân vật (tự biến mất sau 5s) — vẽ ở game-render.js.
+// entity là GL.player (nếu userId là chính mình) hoặc GL.remote[userId] (người khác).
+GL.setChatBubble = function (userId, text) {
+  const entity = userId === GL.me?._id ? GL.player : GL.remote[userId];
+  if (!entity) return;
+  entity.chatBubble = { text, until: performance.now() + GL.CHAT_BUBBLE_MS };
 };
 
 GL.appendWorldChat = function (name, text, mine) {
@@ -67,7 +81,7 @@ GL.appendWorldChat = function (name, text, mine) {
   log.appendChild(line);
   while (log.children.length > 60) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
-  if (!GL.worldChatPanelOpen && !mine) GL.toast(`🌐 ${name}: ${text.length > 30 ? text.slice(0, 30) + '…' : text}`);
+  if (!GL.worldChatPanelOpen && !mine) GL.toast(`${name}: ${text.length > 30 ? text.slice(0, 30) + '…' : text}`, '', 'globe');
 };
 
 GL.guildChatHistory = [];
@@ -98,6 +112,7 @@ document.addEventListener('click', (e) => {
 
 // ---------- Hành trang / trang bị / thuộc tính / kỹ năng ----------
 function itemIconFor(kind, def) {
+  if (def?.icon) return `<img src="${def.icon}" style="width:30px;height:30px;object-fit:contain;border-radius:5px;vertical-align:middle">`;
   const artRarity = def?.rarity === 'starter' ? 'common' : def?.rarity;
   if (kind === 'weapon') {
     if (def.weaponType && def.weaponType !== 'special' && artRarity && artRarity !== 'special') {
@@ -114,6 +129,7 @@ function itemIconFor(kind, def) {
   const cat = def?.effect?.hp ? 'hp_recovery' : def?.effect?.ki ? 'mp_recovery' : def?.effect?.buffAtk ? 'attack_boost'
     : def?.effect?.buffSpd ? 'speed_boost' : def?.effect?.buffMaxHp ? 'defense_boost' : null;
   if (cat) return `<img src="/assets/game/items/${cat}.png" style="width:30px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle">`;
+  if (def?.id === 'teleport_scroll') return GL.icon('scroll', 'gl-icon-lg');
   return GL.icon('flask');
 }
 
@@ -136,23 +152,36 @@ function renderEquipTab() {
     <div class="gl-row"><span>${GL.icon('heart')} HP</span><span>${stats.hp}</span></div>
     <div class="gl-row"><span>${GL.icon('sword')} ATK</span><span>${stats.atk}</span></div>
     <div class="gl-row"><span>${GL.icon('shield')} DEF</span><span>${stats.def}</span></div>
-    <div class="gl-row"><span>⚡ SPD</span><span>${stats.spd}</span></div>
-    <div class="gl-row"><span>🎯 CRIT</span><span>${stats.crit}%</span></div>
-    ${stats.hasFullSpecialSet ? '<div class="gl-row" style="color:var(--gl-gold)"><span>' + GL.icon('sparkles') + ' Bộ đặc biệt</span><span>+40% xử tử</span></div>' : ''}`;
+    <div class="gl-row"><span>${GL.icon('bolt')} SPD</span><span>${stats.spd}</span></div>
+    <div class="gl-row"><span>${GL.icon('target')} CRIT</span><span>${stats.crit}%</span></div>
+    ${stats.hasFullSpecialSet ? '<div class="gl-row" style="color:var(--gl-gold)"><span>' + GL.icon('sparkles') + ' Bộ đặc biệt</span><span>+40% xử tử</span></div>' : ''}
+    ${stats.hasFullSuperSet ? '<div class="gl-row" style="color:#5CE8D8"><span>' + GL.icon('sparkles') + ' Bộ Siêu Cấp</span><span>+' + Math.round(stats.allDmgPct * 100) + '% toàn bộ sát thương</span></div>' : ''}
+    ${stats.hasAura ? '<div class="gl-row" style="color:#F5B84C"><span>' + GL.icon('sparkles') + ' Hào Quang</span><span>Đang kích hoạt</span></div>' : ''}`;
   return html;
 }
 
 function renderBagTab() {
   const owned = GL.char.inventory.filter((i) => !(i.kind === 'weapon' && i.itemId === GL.char.equipment.weapon) && !(i.kind === 'armor' && Object.values(GL.char.equipment).includes(i.itemId)));
   if (!owned.length) return '<div style="color:var(--gl-text-dim);text-align:center;padding:20px 0">Túi đồ trống. Hãy mua thêm từ NPC trong thành!</div>';
-  let html = '<div class="gl-grid">';
+  const hasChest = owned.some((i) => i.itemId === 'treasure_chest');
+  const ownedKeys = owned.filter((i) => i.itemId.startsWith('key_'));
+  let html = '';
+  if (hasChest && ownedKeys.length) {
+    html += `<div class="gl-row" style="background:rgba(245,184,76,.1);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+      <span>${GL.icon('sparkles')} Mở Rương Kho Báu bằng:</span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap">${ownedKeys.map((k) => `<button class="gl-btn-sm" data-openchest="${k.itemId}">${GL.data.consumables[k.itemId].name}</button>`).join('')}</span>
+    </div>`;
+  }
+  html += '<div class="gl-grid">';
   owned.forEach((inv) => {
     const table = inv.kind === 'weapon' ? GL.data.weapons : inv.kind === 'armor' ? GL.data.armor : GL.data.consumables;
     const def = table[inv.itemId]; if (!def) return;
+    const sellable = inv.kind !== 'consumable' ? !!def.price : (def.sellPrice || (def.currency === 'gold' && def.price));
     html += `<div class="gl-item-chip" data-use="${inv.itemId}" data-kind="${inv.kind}" data-slot="${def.slot || ''}">
       <div class="gl-item-icon">${itemIconFor(inv.kind, def)}</div>
       <div class="gl-item-name ${def.rarity ? 'gl-rarity-' + def.rarity : ''}">${def.name}${inv.qty > 1 ? ' ×' + inv.qty : ''}</div>
       ${def.reqLevel ? `<div style="font-size:.58rem;color:${GL.char.level < def.reqLevel ? '#E85C4C' : 'var(--gl-text-dim)'}">Yêu cầu Lv.${def.reqLevel}</div>` : ''}
+      ${sellable ? `<button class="gl-btn-sm gl-item-sell" data-sell="${inv.itemId}" data-sellkind="${inv.kind}" title="Bán">${GL.icon('coin', 'gl-icon-sm')}</button>` : ''}
     </div>`;
   });
   html += '</div>';
@@ -203,18 +232,45 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('#glPanelInventory .gl-tab').forEach((b) => b.addEventListener('click', () => renderInventoryPanel(b.dataset.tab)));
 
   document.getElementById('glPanelBody').addEventListener('click', async (e) => {
+    const sellBtn = e.target.closest('[data-sell]');
+    if (sellBtn) {
+      const { sell: itemId, sellkind: kind } = sellBtn.dataset;
+      const res = await API.post('/game/character/sell', { itemId, kind, qty: 1 });
+      if (res?.success) { GL.char = res.character; GL.updateCurrencyUI(); Toast.success(`Đã bán, nhận ${res.goldGained} vàng`); renderInventoryPanel('bag'); }
+      else Toast.error(res?.message || 'Không thể bán');
+      return;
+    }
+    const chestBtn = e.target.closest('[data-openchest]');
+    if (chestBtn) {
+      const res = await API.post('/game/character/chest/open', { keyId: chestBtn.dataset.openchest });
+      if (res?.success) { GL.char = res.character; GL.updateCurrencyUI(); Toast.success(`Mở rương: ${res.rewards.join(', ')}`); renderInventoryPanel('bag'); }
+      else Toast.error(res?.message || 'Không thể mở rương');
+      return;
+    }
     const chip = e.target.closest('[data-use]');
     if (chip) {
       const { use: itemId, kind, slot } = chip.dataset;
       if (kind === 'consumable') {
-        const res = await API.post('/game/character/use-item', { itemId });
-        if (res?.success) {
-          GL.char = res.character;
-          if (res.effect?.hp) { GL.player.hp = Math.min(GL.currentStats().hp, GL.player.hp + GL.currentStats().hp * res.effect.hp); GL.updateVitalsUI(); }
-          if (res.effect?.ki) { GL.player.ki = Math.min(GL.currentStats().ki, (GL.player.ki ?? GL.currentStats().ki) + GL.currentStats().ki * res.effect.ki); GL.updateVitalsUI(); }
-          Toast.success('Đã dùng vật phẩm');
-          renderInventoryPanel('bag');
+        let extraBody = {};
+        if (itemId === 'feather_quill') {
+          const newName = prompt('Nhập tên mới cho nhân vật (2-20 ký tự):', GL.char.name);
+          if (!newName) return;
+          extraBody.newName = newName;
         }
+        const res = await API.post('/game/character/use-item', { itemId, ...extraBody });
+        if (!res?.success) { Toast.error(res?.message || 'Không thể dùng vật phẩm'); return; }
+        GL.char = res.character;
+        if (res.effect?.hp) { GL.player.hp = Math.min(GL.currentStats().hp, GL.player.hp + GL.currentStats().hp * res.effect.hp); GL.updateVitalsUI(); }
+        if (res.effect?.ki) { GL.player.ki = Math.min(GL.currentStats().ki, (GL.player.ki ?? GL.currentStats().ki) + GL.currentStats().ki * res.effect.ki); GL.updateVitalsUI(); }
+        if (res.effect?.buffAtk) { GL.player.buffAtkUntil = performance.now() + res.effect.buffSec * 1000; GL.player.buffAtkPct = res.effect.buffAtk; }
+        if (res.effect?.buffSpd) { GL.player.buffSpdUntil = performance.now() + res.effect.buffSec * 1000; GL.player.buffSpdPct = res.effect.buffSpd; }
+        if (res.effect?.buffAllDmgPct) { GL.auraDmgBuffUntil = Math.max(GL.auraDmgBuffUntil, performance.now() + res.effect.buffSec * 1000); } // dùng chung cơ chế nhân sát thương tạm thời với Aura cho gọn
+        if (res.effect?.resetCooldowns) { GL.player.skillCd = [0, 0]; GL.player.dashCd = 0; GL.player.flyCd = 0; ['glCd1', 'glCd2', 'glCdDash', 'glCdFly'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; }); }
+        if (res.effect?.recallPets) GL.pets.forEach((pet) => { pet.x = GL.player.x + (pet.slot === 0 ? -34 : 34); pet.y = GL.GROUND_Y; });
+        if (res.effect?.guardianAngelSec) GL.player.guardianAngelUntil = performance.now() + res.effect.guardianAngelSec * 1000;
+        if (res.goldGained) GL.updateCurrencyUI();
+        Toast.success('Đã dùng vật phẩm');
+        renderInventoryPanel('bag');
       } else {
         const res = await API.post('/game/character/equip', { itemId, kind, slot });
         if (res?.success) { GL.char = res.character; GL.updateVitalsUI(); renderInventoryPanel('equip'); Toast.success('Đã trang bị'); }
@@ -244,6 +300,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------- Bản đồ ----------
   document.getElementById('glBtnMap').addEventListener('click', () => { renderMapPanel(); openPanel('glPanelMap'); });
 
+  // ---------- Pet ----------
+  document.getElementById('glBtnPet')?.addEventListener('click', () => { renderPetPanel(); openPanel('glPanelPet'); });
+
   // ---------- Thông báo ----------
   document.getElementById('glBtnNotif').addEventListener('click', () => { GL.requestBossStatus(); renderNotifPanel(); openPanel('glPanelNotif'); });
 
@@ -261,8 +320,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function sendChat() {
     const inp = document.getElementById('glChatInput');
     if (!inp.value.trim()) return;
-    GL.socketEmit('game_chat', { mapId: GL.map.id, text: inp.value });
-    GL.appendChat(GL.char.name, inp.value);
+    const raw = inp.value;
+    GL.socketEmit('game_chat', { mapId: GL.map.id, text: raw });
+    GL.appendChat(GL.me._id, GL.char.name, raw); // sửa lỗi cũ: thiếu tham số userId khiến text bị lệch vị trí (text.replace trên undefined)
+    // Lệnh pet: gõ đúng "def"/"atk"/"fl" (không phân biệt hoa thường) -> vừa hiện như chat bình thường vừa đổi chế độ pet
+    const cmd = raw.trim().toLowerCase();
+    if (['def', 'atk', 'fl'].includes(cmd)) GL.setAllPetsMode(cmd);
     inp.value = '';
   }
 
@@ -304,7 +367,9 @@ function renderMapPanel() {
   document.getElementById('glMapBody').onclick = async (e) => {
     const el = e.target.closest('[data-goto]'); if (!el) return;
     const map = GL.mapById(el.dataset.goto);
-    await API.post('/game/character/move', { mapId: map.id, x: 400, y: 300 });
+    const res = await API.post('/game/character/move', { mapId: map.id, x: 400, y: 300 });
+    if (!res?.success) { GL.toast(res?.message || 'Không thể di chuyển'); return; }
+    GL.char = res.character; GL.updateCurrencyUI();
     GL.player.x = 400; GL.player.y = 300;
     GL.joinMap(map);
     closePanel('glPanelMap');
@@ -314,9 +379,9 @@ function renderMapPanel() {
 // Thư Viện: quái / Thần Hộ Vệ (dữ liệu đã có nhưng chưa gắn AI riêng) / Thần Linh — xem bằng ảnh thật
 function renderBestiaryPanel() {
   const el = document.getElementById('glBestiaryBody');
-  const card = (imgUrl, name, sub, ring) => `
+  const card = (imgUrl, name, sub, ring, fallbackUrl) => `
     <div style="display:flex;align-items:center;gap:10px;padding:6px 4px">
-      <img src="${imgUrl}" onerror="this.style.visibility='hidden'" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:1.5px solid ${ring || 'var(--gl-gold-dim)'};background:#1a1826;flex:0 0 auto">
+      <img src="${imgUrl}" onerror="${fallbackUrl ? `this.onerror=function(){this.style.visibility='hidden'};this.src='${fallbackUrl}'` : "this.style.visibility='hidden'"}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:1.5px solid ${ring || 'var(--gl-gold-dim)'};background:#1a1826;flex:0 0 auto">
       <div><div style="font-size:.78rem;font-weight:700">${name}</div>${sub ? `<div style="font-size:.65rem;color:var(--gl-text-dim)">${sub}</div>` : ''}</div>
     </div>`;
 
@@ -325,21 +390,21 @@ function renderBestiaryPanel() {
   html += '<b style="color:var(--gl-gold-2)">' + GL.icon('target') + ' Quái Vật (theo lục địa)</b><div class="gl-grid" style="grid-template-columns:1fr 1fr">';
   GL.data.continents.forEach((cont) => {
     Object.values(GL.data.monsters).filter((m) => m.continent === cont.id).forEach((m) => {
-      html += card(`/assets/game/monsters/${m.id}.png`, m.nameVN, `${cont.name} · ${m.name}`, m.color);
+      html += card(`/assets/game/sprites/monsters/${m.id}/idle/1.png`, m.nameVN, `${cont.name} · ${m.name}`, m.color, `/assets/game/monsters/${m.id}.png`);
     });
   });
   html += '</div>';
 
   html += '<b style="color:var(--gl-gold-2);display:block;margin-top:12px">' + GL.icon('crown') + ' Chaoseraph — Boss Thế Giới</b>';
   html += '<div style="font-size:.62rem;color:var(--gl-text-dim);margin-bottom:4px">Lang thang khắp các lục địa, biến hình qua 5 Dạng khi càng mất máu — xem mục Thông Báo để dịch chuyển tới.</div>';
-  html += card('/assets/game/bosses/chaoseraph_1.png', 'Chaoseraph', 'Thần Hỗn Mang · 5 Dạng biến hình', '#E85C4C');
+  html += card('/assets/game/sprites/bosses/b_chaoseraph_form1/idle/1.png', 'Chaoseraph', 'Thần Hỗn Mang · 5 Dạng biến hình', '#E85C4C', '/assets/game/bosses/chaoseraph_1.png');
 
   html += '<b style="color:var(--gl-gold-2);display:block;margin-top:12px">' + GL.icon('shield') + ' Thần Hộ Vệ (mỗi lục địa 1 vị, xuất hiện ở map Boss)</b>';
   html += '<div class="gl-grid" style="grid-template-columns:1fr 1fr">';
   GL.data.bosses.filter((b) => b.id !== 'b_chaoseraph' && b.id !== 'b_morphiel').forEach((b) => {
     const contId = b.continent;
     const cont = GL.data.continents.find((c) => c.id === contId);
-    html += card(`/assets/game/bosses/${b.id}.png`, b.name, b.title, cont?.color);
+    html += card(`/assets/game/sprites/bosses/${b.id}/idle/1.png`, b.name, b.title, cont?.color, `/assets/game/bosses/${b.id}.png`);
   });
   html += '</div>';
 
@@ -376,7 +441,7 @@ async function renderGuildPanel() {
       <b style="color:var(--gl-gold-2);font-size:.75rem">Thành viên</b>
       <div id="glGuildMembers"></div>
       <button class="gl-btn-sm" id="glGuildLeave" style="margin:10px 0;background:rgba(232,92,76,.25)">Rời Bang Hội</button>
-      <b style="color:var(--gl-gold-2);font-size:.75rem;display:block;margin-top:4px">💬 Chat Bang Hội</b>
+      <b style="color:var(--gl-gold-2);font-size:.75rem;display:block;margin-top:4px">${GL.icon('chat')} Chat Bang Hội</b>
       <div id="glGuildChatLog" style="height:140px;overflow-y:auto;display:flex;flex-direction:column;gap:3px;font-size:.7rem;background:rgba(8,7,14,.4);border-radius:8px;padding:8px;margin:6px 0"></div>
       <div style="display:flex;gap:6px">
         <input id="glGuildChatInput" maxlength="140" placeholder="Nhắn với Bang…" style="flex:1;background:rgba(8,7,14,.7);border:1px solid var(--gl-gold-dim);border-radius:99px;padding:7px 12px;color:#fff;font-size:.72rem">
@@ -406,7 +471,7 @@ async function renderGuildPanel() {
   const list = await API.get('/guild/list');
   el.innerHTML = `
     <div style="border:1px solid var(--gl-gold-dim);border-radius:10px;padding:10px;margin-bottom:12px">
-      <b style="color:var(--gl-gold-2);font-size:.78rem">Lập Bang Hội mới (500 🪙)</b>
+      <b style="color:var(--gl-gold-2);font-size:.78rem">Lập Bang Hội mới (500 ${GL.icon('coin', 'gl-icon-sm')})</b>
       <input id="glGuildNewName" maxlength="24" placeholder="Tên Bang Hội" style="width:100%;margin-top:6px;background:rgba(8,7,14,.7);border:1px solid var(--gl-gold-dim);border-radius:8px;padding:7px 10px;color:#fff;font-size:.75rem">
       <input id="glGuildNewTag" maxlength="4" placeholder="Tag (VD: MXH)" style="width:100%;margin-top:6px;background:rgba(8,7,14,.7);border:1px solid var(--gl-gold-dim);border-radius:8px;padding:7px 10px;color:#fff;font-size:.75rem">
       <button class="gl-btn-sm" id="glGuildCreate" style="margin-top:8px;width:100%">Thành Lập</button>
@@ -432,6 +497,45 @@ async function renderGuildPanel() {
   };
 }
 
+const PET_MODE_DESC = { def: 'Chỉ đánh quái đến gần BẠN — bảo vệ, không đi xa', atk: 'Chủ động lao ra đánh quái ở khoảng cách xa hơn', fl: 'Chỉ đi theo, không tự đánh quái nào cả' };
+function renderPetPanel() {
+  const el = document.getElementById('glPanelPetBody');
+  const pets = GL.char.pets || [];
+  let html = '';
+  if (!pets.length) {
+    html = `<div style="color:var(--gl-text-dim);text-align:center;padding:16px 0">Bạn chưa có pet nào.<br>Săn Boss Thế Giới (ChaosLord) để có cơ hội nhận pet ngẫu nhiên!</div>`;
+  } else {
+    pets.forEach((p) => {
+      html += `<div style="border:1px solid var(--gl-border);border-radius:10px;padding:10px;margin-bottom:10px">
+        <div style="display:flex;gap:10px;align-items:center">
+          <img src="${p.isDead ? p.diePortrait : p.portrait}" style="width:52px;height:52px;object-fit:contain;opacity:${p.isDead ? .5 : 1}">
+          <div style="flex:1">
+            <div><b style="${p.tier === 'vip' ? 'color:var(--gl-gold)' : ''}">${p.name}</b> <span style="color:var(--gl-text-dim);font-size:.65rem">${p.role === 'daica' ? 'Đại Ca' : 'Tiểu Đệ'} · ${p.tier === 'vip' ? 'VIP' : 'Thường'}</span></div>
+            <div style="font-size:.68rem;color:var(--gl-text-dim)">HP ${p.stats.hp} · ATK ${p.stats.atk} · DEF ${p.stats.def} · Ki ${p.stats.ki}</div>
+            ${p.isDead ? `<div style="color:#ff8a8a;font-size:.68rem">Đang hồi sinh...</div>` : ''}
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:.65rem;color:var(--gl-text-dim)">
+          Chiêu 2: ${p.skill2Version ? 'V' + p.skill2Version : 'Chưa mở (Lv.20)'} · Chiêu 3: ${p.skill3Version ? 'V' + p.skill3Version : 'Chưa mở (Lv.40)'} · Chiêu 4: ${p.hasSkill4 ? 'Đã mở' : 'Chưa mở (Lv.60)'}
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          ${['def', 'atk', 'fl'].map((m) => `<button class="gl-btn-sm" data-petmode="${p.slot}:${m}" style="flex:1;${p.mode === m ? 'background:var(--gl-gold-dim);color:#000' : ''}" title="${PET_MODE_DESC[m]}">${{ def: 'Thủ', atk: 'Công', fl: 'Theo' }[m]}</button>`).join('')}
+        </div>
+      </div>`;
+    });
+  }
+  if (!GL.char.petSlot2Unlocked && pets.length) {
+    html += `<div style="color:var(--gl-text-dim);font-size:.68rem;text-align:center">Dùng vật phẩm "Lệnh Bái Sư" để mở thêm 1 ô pet (Tiểu Đệ).</div>`;
+  }
+  el.innerHTML = html;
+  el.onclick = async (e) => {
+    const btn = e.target.closest('[data-petmode]'); if (!btn) return;
+    const [slot, mode] = btn.dataset.petmode.split(':');
+    const res = await API.post('/game/character/pet/mode', { slot: Number(slot), mode });
+    if (res?.success) { GL.char = res.character; GL.spawnPetsFromChar(); renderPetPanel(); }
+  };
+}
+
 function renderNotifPanel() {
   const mails = (GL.char.mailbox || []).filter((m) => !m.claimed);
   const duels = (GL.char.godDuels || []).filter((d) => d.status === 'pending');
@@ -444,22 +548,22 @@ function renderNotifPanel() {
     </div>`;
   }
   if (duels.length) {
-    html += `<div style="color:var(--gl-gold);font-size:.7rem;font-weight:700;margin-bottom:6px">⚔️ THÁCH ĐẤU THẦN LINH</div>`;
+    html += `<div style="color:var(--gl-gold);font-size:.7rem;font-weight:700;margin-bottom:6px">${GL.icon('sword')} THÁCH ĐẤU THẦN LINH</div>`;
     html += duels.map((d) => `<div class="gl-row"><span>Thư thách đấu từ <b>${d.godName}</b><br><span style="color:var(--gl-text-dim);font-size:.65rem">Mở khoá ở cấp ${d.tier * 10} · Thua không mất gì</span></span><button class="gl-btn-sm" data-duel="${d.tier}">Chiến đấu</button></div>`).join('');
   }
   if (mails.length) {
     html += `<div style="color:var(--gl-gold);font-size:.7rem;font-weight:700;margin-bottom:6px">${GL.icon('scroll')} HÒM THƯ (${mails.length})</div>`;
-    html += mails.map((m) => `<div class="gl-row"><span><b>${m.title}</b><br><span style="color:var(--gl-text-dim);font-size:.65rem">${m.message || ''}${m.gold ? ' · 🪙' + m.gold : ''}${m.gem ? ' · 💎' + m.gem : ''}</span></span><button class="gl-btn-sm" data-mail="${m._id}">Nhận</button></div>`).join('');
+    html += mails.map((m) => `<div class="gl-row"><span><b>${m.title}</b><br><span style="color:var(--gl-text-dim);font-size:.65rem">${m.message || ''}${m.gold ? ' · ' + GL.icon('coin', 'gl-icon-sm') + m.gold : ''}${m.gem ? ' · ' + GL.icon('gem', 'gl-icon-sm') + m.gem : ''}</span></span><button class="gl-btn-sm" data-mail="${m._id}">Nhận</button></div>`).join('');
   }
   if (claimable.length) {
-    if (mails.length) html += `<div style="color:var(--gl-gold);font-size:.7rem;font-weight:700;margin:10px 0 6px">📜 NHIỆM VỤ</div>`;
+    if (mails.length) html += `<div style="color:var(--gl-gold);font-size:.7rem;font-weight:700;margin:10px 0 6px">${GL.icon('scroll')} NHIỆM VỤ</div>`;
     html += claimable.map((q) => `<div class="gl-row"><span>${GL.icon('check')} Hoàn thành: <b>${q.name}</b></span><button class="gl-btn-sm" data-claim="${q.id}">Nhận thưởng</button></div>`).join('');
   }
   if (!mails.length && !claimable.length) {
     html += `<div style="color:var(--gl-text-dim);text-align:center;padding:16px 0">Chưa có thông báo mới.</div>`;
   }
-  html += `<div style="margin-top:16px;padding:12px;border:1px dashed var(--gl-gold-dim);border-radius:12px;font-size:.72rem;color:var(--gl-text-dim)">
-    🔔 Thư thách đấu từ các Vị Thần (mỗi 10 cấp) và thông báo bang hội sẽ xuất hiện ở đây trong bản cập nhật tiếp theo.
+  html += `<div style="margin-top:16px;padding:12px;border:1px dashed var(--gl-gold-dim);border-radius:12px;font-size:.72rem;color:var(--gl-text-dim);display:flex;gap:8px;align-items:flex-start">
+    ${GL.icon('bell')} <span>Thư thách đấu từ các Vị Thần (mỗi 10 cấp) và thông báo bang hội sẽ xuất hiện ở đây trong bản cập nhật tiếp theo.</span>
   </div>`;
   document.getElementById('glNotifBody').innerHTML = html;
   document.getElementById('glNotifBody').onclick = async (e) => {
@@ -481,7 +585,7 @@ function renderNotifPanel() {
     if (teleBtn && GL.lastBossStatus?.active) {
       const map = GL.mapById(GL.lastBossStatus.mapId);
       if (!map) { Toast.error('Không tìm thấy bản đồ của Boss'); return; }
-      await API.post('/game/character/move', { mapId: map.id, x: GL.BOSS_SPOT?.x ?? 500, y: GL.BOSS_SPOT?.y ?? 300 });
+      await API.post('/game/character/move', { mapId: map.id, x: GL.BOSS_SPOT?.x ?? 500, y: GL.BOSS_SPOT?.y ?? 300, freeTeleport: true });
       GL.player.x = GL.BOSS_SPOT?.x ?? 500; GL.player.y = GL.BOSS_SPOT?.y ?? 300;
       GL.joinMap(map, GL.lastBossStatus.zone);
       closePanel('glPanelNotif');
@@ -492,6 +596,25 @@ function renderNotifPanel() {
 }
 
 // ---------- NPC ----------
+// Hào Quang: CHỈ hiện tại NPC Trưởng Lão Nhiệm Vụ ở Lục Địa Ánh Sáng (Aurelion) — đúng theo bản spec,
+// dù NPC này (cùng roster NPC_DEFS) xuất hiện ở mọi lục địa khác.
+function renderAuraSection() {
+  if (GL.map?.continentId !== 'aurelion') return '';
+  const aura = GL.data.aura;
+  if (!aura) return '';
+  if (GL.char.hasAura) {
+    return `<div class="gl-row" style="margin-top:10px;border-top:1px solid var(--gl-border);padding-top:10px;color:#F5B84C">
+      <span>${GL.icon('sparkles')} ${aura.name}</span><span>Đã sở hữu</span></div>`;
+  }
+  const okLevel = GL.char.level >= aura.reqLevel;
+  return `<div style="margin-top:10px;border-top:1px solid var(--gl-border);padding-top:10px">
+    <div style="font-weight:600;color:#F5B84C">${GL.icon('sparkles')} ${aura.name}</div>
+    <div style="color:var(--gl-text-dim);font-size:.68rem;margin:4px 0">${aura.dialogue}</div>
+    <div style="font-size:.65rem;color:var(--gl-text-dim)">Yêu cầu: Lv.${aura.reqLevel}+ · ${aura.costSpecialPieces} trang bị đặc biệt bất kỳ · ${aura.costUpgradeStones} Đá Nâng Trang Bị Đặc Biệt</div>
+    <button class="gl-cta-btn" style="margin-top:6px" data-aura-exchange ${okLevel ? '' : 'disabled'}>${okLevel ? 'Đổi Lấy Hào Quang' : `Cần đạt Lv.${aura.reqLevel}`}</button>
+  </div>`;
+}
+
 GL.openNpc = function (npc) {
   document.getElementById('glNpcTitle').textContent = `${npc.icon} ${npc.name}`;
   const body = document.getElementById('glNpcBody');
@@ -511,10 +634,17 @@ GL.openNpc = function (npc) {
     body.innerHTML = (GL.data.quests || []).map((q) => {
       const prog = progressFor(q);
       const claimed = GL.char.questProgress?.[q.id + '_claimed'];
-      return `<div class="gl-row"><span>${q.name}<br><span style="color:var(--gl-text-dim);font-size:.62rem">${q.desc || ''}</span><br><span style="color:var(--gl-text-dim);font-size:.65rem">${Math.min(prog, q.target)}/${q.target} · Thưởng ${q.reward.xp ? q.reward.xp + ' EXP ' : ''}${q.reward.gold ? q.reward.gold + '🪙 ' : ''}${q.reward.gem ? q.reward.gem + '💎' : ''}</span></span>
+      return `<div class="gl-row"><span>${q.name}<br><span style="color:var(--gl-text-dim);font-size:.62rem">${q.desc || ''}</span><br><span style="color:var(--gl-text-dim);font-size:.65rem">${Math.min(prog, q.target)}/${q.target} · Thưởng ${q.reward.xp ? q.reward.xp + ' EXP ' : ''}${q.reward.gold ? q.reward.gold + GL.icon('coin', 'gl-icon-sm') + ' ' : ''}${q.reward.gem ? q.reward.gem + GL.icon('gem', 'gl-icon-sm') : ''}</span></span>
         <button class="gl-btn-sm" data-claim="${q.id}" ${claimed || prog < q.target ? 'disabled' : ''}>${claimed ? 'Đã nhận' : 'Nhận'}</button></div>`;
-    }).join('');
+    }).join('') + renderAuraSection();
     body.onclick = async (e) => {
+      const auraBtn = e.target.closest('[data-aura-exchange]');
+      if (auraBtn) {
+        const res = await API.post('/game/character/aura/exchange', {});
+        if (res?.success) { GL.char = res.character; GL.updateVitalsUI(); Toast.success('Đã kích hoạt Hào Quang Thăng Hoa!'); GL.openNpc(npc); }
+        else Toast.error(res?.message || 'Không thể đổi Hào Quang');
+        return;
+      }
       const btn = e.target.closest('[data-claim]'); if (!btn) return;
       const res = await API.post('/game/character/quests/claim', { questId: btn.dataset.claim });
       if (res?.success) {
@@ -522,7 +652,7 @@ GL.openNpc = function (npc) {
         if (res.leveledUp?.length) {
           GL.toast(`LÊN CẤP ${res.character.level}!`, 'gl-toast-levelup');
           if (res.character.level % GL.data.pointsEvery === 0) GL.toast('Nhận điểm thuộc tính & kỹ năng mới!');
-          if (res.character.godDuels?.some((d) => d.status === 'pending')) GL.toast('⚔️ Có thách đấu Thần Linh mới trong Thông Báo!');
+          if (res.character.godDuels?.some((d) => d.status === 'pending')) GL.toast('Có thách đấu Thần Linh mới trong Thông Báo!', '', 'sword');
           GL.updateVitalsUI();
         }
       }
@@ -542,7 +672,7 @@ GL.openNpc = function (npc) {
         <div class="gl-item-icon">${itemIconFor(isWeapon ? 'weapon' : npc.kind === 'armor' ? 'armor' : 'consumable', it)}</div>
         <div class="gl-item-name ${it.rarity ? 'gl-rarity-' + it.rarity : ''}">${it.name}</div>
         ${it.reqLevel ? `<div style="font-size:.58rem;color:${GL.char.level < it.reqLevel ? '#E85C4C' : 'var(--gl-text-dim)'}">Yêu cầu Lv.${it.reqLevel}</div>` : ''}
-        <div style="font-size:.62rem;margin-top:2px">${it.price} ${it.currency === 'gem' ? '💎' : '🪙'}</div>
+        <div style="font-size:.62rem;margin-top:2px;display:flex;align-items:center;gap:3px">${it.price} ${it.currency === 'gem' ? GL.icon('gem', 'gl-icon-sm') : GL.icon('coin', 'gl-icon-sm')}</div>
       </div>`).join('') + '</div>';
     body.onclick = async (e) => {
       const chip = e.target.closest('[data-buy]'); if (!chip) return;
