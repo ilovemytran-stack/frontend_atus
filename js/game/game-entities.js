@@ -56,7 +56,10 @@ GL.spawnMonsters = function (map) {
       uid: 'm' + i + '_' + Date.now(),
       defId: monsterId, def, isBoss,
       x: p.x, y: p.y, homeX: p.x, homeY: p.y,
-      hp: scaled.hp, maxHp: scaled.hp, atk: scaled.atk, def: scaled.def,
+      // armor (không phải "def" — trùng tên với def ở trên = object nameVN/color/shape, bị số này ĐÈ MẤT,
+      // khiến mọi nhãn tên quái hiển thị chữ "undefined" thay vì tên thật; đã sửa hết chỗ đọc .def làm
+      // giáp sang .armor bên dưới)
+      hp: scaled.hp, maxHp: scaled.hp, atk: scaled.atk, armor: scaled.def,
       xp: scaled.xp, goldMin: scaled.goldMin, goldMax: scaled.goldMax, gemChance: scaled.gemChance,
       state: 'idle', dir: 1, attackTimer: 0, alive: true, respawnAt: 0,
     });
@@ -140,7 +143,7 @@ GL.updateMonsters = function (dt, now) {
     m.attackTimer -= dt;
     if (bestD < 42 && m.attackTimer <= 0) {
       m.attackTimer = 1.2;
-      const targetDef = target === p ? GL.currentStats().def : target.def;
+      const targetDef = target === p ? GL.currentStats().def : target.armor;
       const { dmg, crit } = GL.rollDamage(m.atk, targetDef, 5);
       if (target === p) GL.damagePlayer(dmg); else GL.damageSummon(target, dmg);
       GL.spawnDamageNumber(target.x, target.y - 30, '-' + dmg, crit ? 'gl-crit' : '');
@@ -161,7 +164,7 @@ GL.spawnSummon = function (defId, skillId, duration) {
   GL.summons.push({
     uid: 's' + Date.now() + Math.random(), defId, def,
     x: GL.player.x + 34, y: GL.GROUND_Y, dir: 1,
-    hp, maxHp: hp, atk, def: defStat, speed: def.speed,
+    hp, maxHp: hp, atk, armor: defStat, speed: def.speed, // armor không phải "def" — cùng lý do đã sửa ở GL.spawnMonsters
     expiresAt: performance.now() + duration * 1000, state: 'idle', attackTimer: 0, alive: true,
   });
 };
@@ -182,7 +185,7 @@ GL.updateSummons = function (dt, now) {
         s.x += dirX * s.speed * dt; s.dir = dirX; s.state = 'chase';
       } else {
         s.state = 'attack'; s.attackTimer -= dt;
-        if (s.attackTimer <= 0) { s.attackTimer = 1.1; const dmgInfo = GL.rollDamage(s.atk, target.def, 5); GL.applyMonsterHit(target, dmgInfo); }
+        if (s.attackTimer <= 0) { s.attackTimer = 1.1; const dmgInfo = GL.rollDamage(s.atk, target.armor, 5); GL.applyMonsterHit(target, dmgInfo); }
       }
     } else {
       const d = GL.distX(s, GL.player);
@@ -199,7 +202,10 @@ GL.updateSummons = function (dt, now) {
 // có 3 chế độ đổi qua chat (def/atk/fl) hoặc bảng Pet, và có tối đa 3 chiêu mở dần theo level (đồng bộ
 // theo char.level, xem GL.data.petSkill2Versions/petSkill3Versions/petSkill4).
 // LƯU Ý ĐẶT TÊN: `defObj` = object định nghĩa loại pet (tên/portrait/frameCount, từ GL.data.pets), còn
-// `def` (không có Obj) = CHỈ SỐ PHÒNG THỦ, đúng quy ước đang dùng cho quái/summon (m.def, s.def...).
+// `def` (không có Obj) = CHỈ SỐ PHÒNG THỦ — pet vốn đã tách đúng 2 tên riêng biệt như vậy. Quái/summon
+// TRƯỚC ĐÂY dùng chung "def" cho cả object định nghĩa (nameVN/color/shape) LẪN chỉ số phòng thủ, số
+// đè mất object khiến mọi nhãn tên hiện "undefined" — đã đổi chỉ số phòng thủ của quái/summon sang
+// `armor` (m.armor, s.armor) để không còn trùng tên với `def`/`defObj` (object định nghĩa) nữa.
 GL.spawnPetsFromChar = function (opts = {}) {
   const fresh = !!opts.fresh; // true khi mới vào game / vừa đổi map -> đặt lại vị trí cạnh chủ + đầy HP
   const list = (GL.char.pets || []).map((p, idx) => {
@@ -252,7 +258,7 @@ function petSkillMultCd(pet) {
 // Chiêu 2 (tầm xa, "chưởng") — bắn thẳng vào mục tiêu hiện tại, không cần lại gần
 function petCastSkill2(pet, target, s2) {
   pet.skill2Cd = s2.cd;
-  const dmgInfo = GL.rollDamage(pet.atk * s2.mult * GL.auraDmgMult(), target.def || 0, 5);
+  const dmgInfo = GL.rollDamage(pet.atk * s2.mult * GL.auraDmgMult(), target.armor || 0, 5);
   if (target === 'boss') { GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg }); GL.spawnDamageNumber(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y - 50, dmgInfo.dmg, 'gl-crit'); }
   else GL.applyMonsterHit(target, dmgInfo);
   GL.spawnDamageNumber(pet.x, pet.y - 40, 'Chưởng!', '');
@@ -334,7 +340,7 @@ GL.updatePets = function (dt, now) {
       pet.state = 'attack'; pet.attackTimer -= dt;
       if (pet.attackTimer <= 0) {
         pet.attackTimer = 0.9;
-        const dmgInfo = GL.rollDamage(pet.atk * GL.auraDmgMult(), target === 'boss' ? 0 : target.def, 8);
+        const dmgInfo = GL.rollDamage(pet.atk * GL.auraDmgMult(), target === 'boss' ? 0 : target.armor, 8);
         if (target === 'boss') { GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg }); GL.spawnDamageNumber(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y - 40, dmgInfo.dmg, dmgInfo.crit ? 'gl-crit' : ''); }
         else GL.applyMonsterHit(target, dmgInfo);
       }
