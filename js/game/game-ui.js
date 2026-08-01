@@ -75,13 +75,28 @@ GL.setChatBubble = function (userId, text) {
 };
 
 GL.appendWorldChat = function (name, text, mine) {
+  const safeText = text.replace(/</g, '&lt;');
   const log = document.getElementById('glWorldChatLog');
   const line = document.createElement('div');
-  line.innerHTML = `<b style="color:${mine ? 'var(--gl-gold-2)' : '#cfd6ff'}">${name}:</b> ${text.replace(/</g, '&lt;')}`;
+  line.innerHTML = `<b style="color:${mine ? 'var(--gl-gold-2)' : '#cfd6ff'}">${name}:</b> ${safeText}`;
   log.appendChild(line);
   while (log.children.length > 60) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
   if (!GL.worldChatPanelOpen && !mine) GL.toast(`${name}: ${text.length > 30 ? text.slice(0, 30) + '…' : text}`, '', 'globe');
+  GL.pushWorldChatTicker(name, safeText, mine);
+};
+
+// Bảng chat thế giới nổi góc trên-phải màn hình — mỗi dòng tự biến mất sau 15s, độc lập với panel chat đầy đủ
+GL.pushWorldChatTicker = function (name, safeText, mine) {
+  const table = document.getElementById('glWorldChatTicker');
+  if (!table) return;
+  const row = document.createElement('div');
+  row.className = 'gl-wct-row';
+  row.innerHTML = `<span class="gl-wct-name" style="color:${mine ? 'var(--gl-gold-2)' : '#8fe3ff'}">${name}</span><span class="gl-wct-text">${safeText}</span>`;
+  table.appendChild(row);
+  while (table.children.length > 6) table.removeChild(table.firstChild);
+  requestAnimationFrame(() => row.classList.add('gl-wct-in'));
+  setTimeout(() => { row.classList.add('gl-wct-out'); setTimeout(() => row.remove(), 320); }, 15000);
 };
 
 GL.guildChatHistory = [];
@@ -106,7 +121,11 @@ function sendGuildChat() {
 function openPanel(id) { document.getElementById(id).style.display = 'flex'; }
 function closePanel(id) { document.getElementById(id).style.display = 'none'; if (id === 'glPanelWorldChat') GL.worldChatPanelOpen = false; }
 document.addEventListener('click', (e) => {
-  if (e.target.matches('[data-close]')) closePanel(e.target.closest('.gl-panel-overlay').id);
+  // dùng closest() thay vì matches() trực tiếp trên e.target — nút [X] chứa <svg><use>, nên khi
+  // chạm vào icon thì e.target là svg/use (không có data-close), không phải chính <button data-close>,
+  // khiến nút bấm không phản hồi và chỉ bấm ra ngoài overlay mới đóng được (bug đã báo).
+  const closeBtn = e.target.closest('[data-close]');
+  if (closeBtn) { const overlay = closeBtn.closest('.gl-panel-overlay'); if (overlay) closePanel(overlay.id); return; }
   if (e.target.matches('.gl-panel-overlay')) closePanel(e.target.id);
 });
 
@@ -272,8 +291,12 @@ document.addEventListener('DOMContentLoaded', () => {
         Toast.success('Đã dùng vật phẩm');
         renderInventoryPanel('bag');
       } else {
+        const hadFullSuperSet = !!GL.char.stats?.hasFullSuperSet;
         const res = await API.post('/game/character/equip', { itemId, kind, slot });
-        if (res?.success) { GL.char = res.character; GL.updateVitalsUI(); renderInventoryPanel('equip'); Toast.success('Đã trang bị'); }
+        if (res?.success) {
+          GL.char = res.character; GL.updateVitalsUI(); renderInventoryPanel('equip'); Toast.success('Đã trang bị');
+          if (!hadFullSuperSet && res.character.stats?.hasFullSuperSet) GL.playSuperSetTransform();
+        }
         else Toast.error(res?.message || 'Không thể trang bị');
       }
       return;
@@ -592,7 +615,7 @@ function renderNotifPanel() {
       Toast.success('Đã dịch chuyển đến chỗ Chaoseraph!');
     }
   };
-  document.getElementById('glNotifDot').style.display = (claimable.length || mails.length || duels.length) ? 'block' : 'none';
+  document.getElementById('glNotifDot').style.display = (claimable.length || mails.length || duels.length || GL.lastBossStatus?.active) ? 'block' : 'none';
 }
 
 // ---------- NPC ----------

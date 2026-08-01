@@ -6,12 +6,14 @@
 GL.WORLD = { w: 3200, h: 220, pad: 100 };
 GL.GROUND_Y = 150; // đường "mặt đất" cố định — nhân vật/quái/NPC luôn đứng trên đường này
 
+// x dời hẳn sang phải (900-1420), tách khỏi vùng spawn mặc định (400) / vào map từ mép trái (124) —
+// trước đây NPC nằm ngay chỗ camera căn giữa lúc mới vào map, trùng vùng joystick trái nên chạm hụt.
 GL.NPC_DEFS = [
-  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: 'scroll', x: 180, y: GL.GROUND_Y, kind: 'quest' },
-  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: 'portal', x: 300, y: GL.GROUND_Y, kind: 'portal' },
-  { id: 'npc_potion', name: 'Dược Sư', icon: 'flask', x: 420, y: GL.GROUND_Y, kind: 'potion' },
-  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: 'sword', x: 540, y: GL.GROUND_Y, kind: 'weapon' },
-  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: 'shield', x: 660, y: GL.GROUND_Y, kind: 'armor' },
+  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: 'scroll', x: 900, y: GL.GROUND_Y, kind: 'quest' },
+  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: 'portal', x: 1030, y: GL.GROUND_Y, kind: 'portal' },
+  { id: 'npc_potion', name: 'Dược Sư', icon: 'flask', x: 1160, y: GL.GROUND_Y, kind: 'potion' },
+  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: 'sword', x: 1290, y: GL.GROUND_Y, kind: 'weapon' },
+  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: 'shield', x: 1420, y: GL.GROUND_Y, kind: 'armor' },
 ];
 
 // Rắc điểm dọc theo 1 đường ngang, cách đều + rung nhẹ (thay cho lưới 2D cũ)
@@ -30,7 +32,7 @@ GL.spawnMonsters = function (map) {
   const list = [];
   if (!map.monsterIds.length) { GL.monsters = list; return list; }
   const count = Math.min(map.maxMonsters || 10, 10);
-  const npcZoneEnd = map.role === 'hub' ? 760 : 200; // né khu NPC nếu là map hub
+  const npcZoneEnd = map.role === 'hub' ? 1500 : 200; // né khu NPC nếu là map hub (đã dời NPC ra x:900-1420)
   const pts = jitteredLine(count, npcZoneEnd, GL.WORLD.w - 100);
   const lvl = map.levelRange[1];
   pts.forEach((p, i) => {

@@ -25,6 +25,7 @@
 .admin-tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .admin-tab { padding: 10px 16px; font-weight: 600; font-size: 0.9rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
 .admin-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+.tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-full); background: var(--accent-red, #ef4444); color: #fff; font-size: 0.68rem; font-weight: 800; margin-left: 4px; vertical-align: 2px; }
 .admin-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
 .admin-toolbar .input { max-width: 280px; }
 .admin-table-wrap { overflow-x: auto; }
@@ -67,6 +68,7 @@
     <div class="admin-tab" data-tab="posts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M4 20l1-4L16 5l3 3L8 19l-4 1z/><path d=M14 7l3 3/></svg> Bài viết</div>
     <div class="admin-tab" data-tab="videos"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x=2 y=5 width=15 height=14 rx=2/><path d=M17 10l5-3v10l-5-3z/></svg> Video</div>
     <div class="admin-tab" data-tab="gmgame"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x=2 y=7 width=20 height=12 rx=3/><path d=M7 12h.01M5 10v4/><path d=M4 12h2/><circle cx=16 cy=11 r=1/><circle cx=18 cy=13 r=1/></svg> GM Game</div>
+    <div class="admin-tab" data-tab="shop"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z/><path d=M3 6h18/><path d=M16 10a4 4 0 0 1-8 0/></svg> Duyệt Shop <span id="shopPendingBadge" class="tab-badge" style="display:none"></span></div>
     <div class="admin-tab" data-tab="announcements"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M3 11l18-5v12L3 14v-3z/><path d=M11.6 16.8L13 21l3-1-1.4-4.2/></svg> Thông Báo</div>
   </div>
 
@@ -111,6 +113,16 @@
       <table class="admin-table">
         <thead><tr><th>Nhân vật</th><th>Tài khoản</th><th>Class</th><th>Cấp</th><th>Vàng/Ngọc</th><th>Buff Dame</th><th>Hành động</th></tr></thead>
         <tbody id="gmCharsTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="panel-shop" class="admin-panel" style="display:none">
+    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Sản phẩm người bán vừa đăng ở Root Shop chờ duyệt — chỉ hiển thị công khai sau khi được chấp thuận ở đây.</div>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Sản phẩm</th><th>Người bán</th><th>Danh mục</th><th>Giá</th><th>Đăng lúc</th><th>Hành động</th></tr></thead>
+        <tbody id="shopPendingTbody"></tbody>
       </table>
     </div>
   </div>
@@ -166,6 +178,7 @@ async function checkAccessAndInit() {
   document.getElementById('adminContent').style.display = 'block';
   await loadStats();
   await loadUsers();
+  refreshShopPendingBadge();
 
   document.getElementById('annConfirmBtn').addEventListener('click', submitAnnouncement);
   document.getElementById('annCloseBtn').addEventListener('click', () => { document.getElementById('annText').value = ''; });
@@ -198,6 +211,7 @@ function loadTab(tab) {
   if (tab === 'posts') return loadPosts();
   if (tab === 'videos') return loadVideos();
   if (tab === 'gmgame') return loadGmChars();
+  if (tab === 'shop') return loadShopPending();
   if (tab === 'announcements') return loadAnnouncements();
 }
 
@@ -428,6 +442,44 @@ async function deleteAnnouncement(id) {
   if (!confirm('Xoá thông báo này?')) return;
   const res = await API.delete(`/admin/announcements/${id}`);
   if (res?.success) { Toast.success('Đã xoá'); loadAnnouncements(); } else Toast.error(res?.message || 'Lỗi');
+}
+
+// ===== DUYỆT SHOP =====
+async function refreshShopPendingBadge() {
+  const res = await API.get('/admin/shop/pending');
+  const n = res?.success ? res.products.length : 0;
+  const badge = document.getElementById('shopPendingBadge');
+  badge.style.display = n ? 'inline-flex' : 'none';
+  badge.textContent = n > 99 ? '99+' : n;
+  return res;
+}
+
+async function loadShopPending() {
+  const res = await refreshShopPendingBadge();
+  if (!res?.success) return;
+  document.getElementById('shopPendingTbody').innerHTML = res.products.length ? res.products.map(p => `
+    <tr>
+      <td>${esc(p.name)}</td>
+      <td>${esc(p.seller?.displayName || p.seller?.username || '?')}</td>
+      <td>${esc(p.category)}</td>
+      <td>${formatNum(p.price)}đ</td>
+      <td>${new Date(p.createdAt).toLocaleString('vi-VN')}</td>
+      <td class="admin-actions">
+        <button class="btn btn-primary btn-sm" onclick="approveShopProduct('${p.id}')">Duyệt</button>
+        <button class="btn btn-secondary btn-sm" onclick="rejectShopProduct('${p.id}')">Từ chối</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Không có sản phẩm nào chờ duyệt</td></tr>';
+}
+
+async function approveShopProduct(id) {
+  const res = await API.put(`/admin/shop/${id}/approve`);
+  if (res?.success) { Toast.success(res.message); loadShopPending(); } else Toast.error(res?.message || 'Lỗi');
+}
+
+async function rejectShopProduct(id) {
+  const reason = prompt('Lý do từ chối (tuỳ chọn):') || '';
+  const res = await API.put(`/admin/shop/${id}/reject`, { reason });
+  if (res?.success) { Toast.success(res.message); loadShopPending(); } else Toast.error(res?.message || 'Lỗi');
 }
 
 checkAccessAndInit();

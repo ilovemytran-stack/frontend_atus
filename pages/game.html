@@ -136,6 +136,9 @@
     <button class="gl-icon-btn" id="glBtnNotif" title="Thông báo"><svg class="gl-icon"><use href="#i-bell"/></svg><span class="gl-notif-dot" id="glNotifDot" style="display:none"></span></button>
   </div>
 
+  <!-- Bảng Chat Thế Giới nổi — góc trên phải, mỗi dòng tự ẩn sau 15s -->
+  <div class="gl-worldchat-ticker" id="glWorldChatTicker"></div>
+
   <!-- Góc dưới trái: joystick di chuyển -->
   <div class="gl-joystick-zone" id="glJoyZone">
     <div class="gl-joystick-base" id="glJoyBase"><div class="gl-joystick-stick" id="glJoyStick"></div></div>
@@ -244,7 +247,7 @@
       <div id="glWorldChatLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-size:.72rem;padding-bottom:8px"></div>
       <div style="display:flex;gap:6px;flex:0 0 auto">
         <input id="glWorldChatInput" maxlength="140" placeholder="Nhắn với toàn server…" style="flex:1;background:rgba(8,7,14,.7);border:1px solid var(--gl-gold-dim);border-radius:99px;padding:8px 14px;color:#fff;font-size:.75rem">
-        <button id="glWorldChatSend" class="gl-btn-sm">Gửi</button>
+        <button id="glWorldChatSend" class="gl-btn-sm" title="Tốn 100 Ngọc mỗi lần gửi">Gửi · 100💎</button>
       </div>
     </div>
   </div>

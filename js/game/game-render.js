@@ -160,6 +160,24 @@ function drawAnimated(sx, sy, category, entityId, wantedClip, holder, dt, opts) 
   return drawPetFrame(sx, sy, `/assets/game/sprites/${category}/${entityId}/${a.clip}/${a.frame}.png`, opts);
 }
 
+// Hiệu ứng "biến hình" khi vừa trang bị ĐỦ 4 món Super Set (equip_motion, 31 frame, xem GD.SUPER_SET).
+// Không đăng ký qua spriteManifest vì đây là 1 sequence DUY NHẤT dùng chung mọi lớp nhân vật, không
+// theo class như combat1/walk/idle — vẽ thẳng qua drawPetFrame với đường dẫn đã biết từ gameData.
+GL.playSuperSetTransform = function () {
+  const superSet = GL.data.superSet;
+  if (!superSet?.equipMotionPath || !GL.player) return;
+  GL.player.superTransformStart = performance.now();
+  GL.player.superTransformUntil = GL.player.superTransformStart + (superSet.equipMotionFrames / GL.SPRITE_FPS) * 1000;
+  GL.toast('Bộ Trang Bị Siêu Cấp đã thức tỉnh — biến hình!', 'gl-toast-levelup', 'sparkles');
+};
+
+function drawSuperSetTransformFrame(sx, sy, dir) {
+  const superSet = GL.data.superSet;
+  const elapsed = performance.now() - (GL.player.superTransformStart || 0);
+  const frame = Math.min(superSet.equipMotionFrames, 1 + Math.floor(elapsed / (1000 / GL.SPRITE_FPS)));
+  return drawPetFrame(sx, sy, `${superSet.equipMotionPath}/${frame}.png`, { dir, heightPx: 112 });
+}
+
 function hashSeed(str) {
   let h = 1779033703;
   for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
@@ -633,10 +651,14 @@ GL.renderFrame = function (t, dt) {
   const syDraw = sy - zOff;
   const cls = GL.classById(GL.char.classId);
   if (GL.char.stats?.hasAura) drawAuraGlow(sx, syDraw, t);
-  const wantedClip = performance.now() < (p.actionUntil || 0) ? p.actionClip : (p.moving ? 'walk' : 'idle');
-  let gotSprite = drawAnimated(sx, syDraw, 'characters', cls.id, wantedClip, p, dt, { dir: p.dir, heightPx: 80 });
-  if (!gotSprite) gotSprite = drawSprite(sx, syDraw, cls.portrait, { dir: p.dir, moving: p.moving, t, heightPx: 80 });
-  if (!gotSprite) drawHumanoid(sx, syDraw, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
+  const inSuperTransform = performance.now() < (p.superTransformUntil || 0);
+  let gotSprite = inSuperTransform && drawSuperSetTransformFrame(sx, syDraw, p.dir);
+  if (!inSuperTransform) {
+    const wantedClip = performance.now() < (p.actionUntil || 0) ? p.actionClip : (p.moving ? 'walk' : 'idle');
+    gotSprite = drawAnimated(sx, syDraw, 'characters', cls.id, wantedClip, p, dt, { dir: p.dir, heightPx: 80 });
+    if (!gotSprite) gotSprite = drawSprite(sx, syDraw, cls.portrait, { dir: p.dir, moving: p.moving, t, heightPx: 80 });
+    if (!gotSprite) drawHumanoid(sx, syDraw, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
+  }
   if (p.z > 2) { // bóng đổ dưới đất khi đang nhảy/bay lên cao, giúp thấy rõ đang rời mặt đất
     ctx.beginPath(); ctx.ellipse(sx, sy + 3 * DPR, 20 * DPR * Math.max(0.4, 1 - p.z / 90), 4.5 * DPR, 0, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fill();

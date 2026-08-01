@@ -13,6 +13,17 @@ GL.initControls = function () {
   const maxR = 40;
   const JUMP_THRESHOLD = -0.55; // kéo lên quá 55% bán kính -> tính là "kéo lên"
 
+  // Joystick nổi: mỗi lần chạm xuống, dời base tới đúng điểm chạm (giới hạn trong vùng zone để không lòi ra ngoài)
+  function moveBaseTo(clientX, clientY) {
+    const zr = zone.getBoundingClientRect();
+    const half = base.offsetWidth / 2;
+    const localX = Math.max(half, Math.min(zr.width - half, clientX - zr.left));
+    const localY = Math.max(half, Math.min(zr.height - half, clientY - zr.top));
+    base.style.left = (localX - half) + 'px';
+    base.style.top = (localY - half) + 'px';
+    baseRect = base.getBoundingClientRect();
+  }
+
   function setStick(dx, dy) {
     const len = Math.hypot(dx, dy);
     const clampedLen = Math.min(maxR, len);
@@ -30,13 +41,14 @@ GL.initControls = function () {
     }
     if (nrm < 0.25) jumpArmed = true;
   }
-  function reset() { stick.style.transform = ''; GL.input.dx = 0; GL.input.dy = 0; activeId = null; jumpArmed = true; }
+  function reset() { stick.style.transform = ''; GL.input.dx = 0; GL.input.dy = 0; activeId = null; jumpArmed = true; base.classList.remove('gl-joy-active'); }
   function handleMove(e) {
     const cx = baseRect.left + baseRect.width / 2, cy = baseRect.top + baseRect.height / 2;
     setStick(e.clientX - cx, e.clientY - cy);
   }
   zone.addEventListener('pointerdown', (e) => {
-    activeId = e.pointerId; baseRect = base.getBoundingClientRect(); zone.setPointerCapture(activeId); handleMove(e);
+    activeId = e.pointerId; moveBaseTo(e.clientX, e.clientY); base.classList.add('gl-joy-active');
+    zone.setPointerCapture(activeId); handleMove(e);
     GL.autoAttackTarget = null; // cầm joystick sẽ huỷ chế độ tự động lao tới đánh
   });
   zone.addEventListener('pointermove', (e) => { if (e.pointerId === activeId) handleMove(e); });
@@ -245,6 +257,13 @@ GL.applyAuraOnHit = function (dmg) {
 
 GL.buffAtkMult = function () { return performance.now() < (GL.player.buffAtkUntil || 0) ? 1 + (GL.player.buffAtkPct || 0) : 1; };
 
+// Đánh xa/đánh gần: lớp dùng vũ khí trong RANGED_WEAPON_TYPES (staff/tome — hệ phép/召喚) được tầm đánh xa
+// hơn hẳn lớp cận chiến (sword/fist/dagger/shield), thay vì trước đây MỌI lớp dùng chung 1 tầm đánh cố định.
+GL.RANGED_WEAPON_TYPES = ['staff', 'tome', 'bow'];
+GL.atkRange = function (stats, meleeBase) {
+  return GL.RANGED_WEAPON_TYPES.includes(stats?.weaponType) ? Math.round(meleeBase * 3.25) : meleeBase;
+};
+
 GL.tryAttack = function () {
   if (GL.player.attackCooldown > 0) return;
   GL.player.attackCooldown = 0.5;
@@ -252,7 +271,7 @@ GL.tryAttack = function () {
   GL.player.actionClip = 'combat1'; GL.player.actionUntil = performance.now() + 450; // gợi ý clip animation cho đòn đánh thường
   const stats = GL.currentStats();
   const atkWithBuffs = stats.atk * GL.auraDmgMult() * GL.buffAtkMult() * (1 + (stats.allDmgPct || 0));
-  const bossTarget = GL.nearestBossTarget(90);
+  const bossTarget = GL.nearestBossTarget(GL.atkRange(stats, 90));
   if (bossTarget) {
     const dmgInfo = GL.rollDamage(atkWithBuffs, 0, stats.crit);
     GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg });
@@ -260,7 +279,7 @@ GL.tryAttack = function () {
     GL.applyAuraOnHit(dmgInfo.dmg);
     return;
   }
-  const target = GL.nearestMonster(80);
+  const target = GL.nearestMonster(GL.atkRange(stats, 80));
   if (target) {
     const dmgInfo = GL.rollDamage(atkWithBuffs, target.def, stats.crit);
     GL.applyMonsterHit(target, dmgInfo);
@@ -292,7 +311,8 @@ GL.trySkill = function (slot) {
     GL.spawnDamageNumber(GL.player.x, GL.player.y - 20, '+' + healAmt, 'gl-heal');
   } else {
     const isAoe = slot === 2 || skill.isBlessing;
-    const bossTarget = !isAoe ? GL.nearestBossTarget(110) : null;
+    const skillRange = GL.atkRange(stats, 110);
+    const bossTarget = !isAoe ? GL.nearestBossTarget(skillRange) : null;
     const atkMult = skill.mult * lvBonus * GL.auraDmgMult() * GL.buffAtkMult() * (1 + (stats.allDmgPct || 0));
     if (bossTarget) {
       const dmgInfo = GL.rollDamage(stats.atk * atkMult, 0, stats.crit + 10);
@@ -300,7 +320,7 @@ GL.trySkill = function (slot) {
       GL.spawnDamageNumber(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y - 40, dmgInfo.dmg, dmgInfo.crit ? 'gl-crit' : '');
       GL.applyAuraOnHit(dmgInfo.dmg);
     } else {
-      const targets = isAoe ? GL.monsters.filter((m) => m.alive && GL.dist(m, GL.player) < 110) : [GL.nearestMonster(110)].filter(Boolean);
+      const targets = isAoe ? GL.monsters.filter((m) => m.alive && GL.dist(m, GL.player) < skillRange) : [GL.nearestMonster(skillRange)].filter(Boolean);
       targets.forEach((m) => {
         const dmgInfo = GL.rollDamage(stats.atk * atkMult, m.def, stats.crit + 10);
         GL.applyMonsterHit(m, dmgInfo);

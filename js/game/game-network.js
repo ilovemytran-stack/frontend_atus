@@ -21,6 +21,8 @@ GL.initSocket = function () {
   });
   GL.socket.on('game_chat_message', ({ userId, name, text }) => GL.appendChat(userId, name, text));
   GL.socket.on('game_world_chat_message', ({ userId, name, text }) => GL.appendWorldChat(name, text, userId === GL.me._id));
+  GL.socket.on('game_world_chat_paid', ({ gem }) => { GL.char.gem = gem; GL.updateCurrencyUI(); });
+  GL.socket.on('game_world_chat_error', ({ message }) => GL.toast(message || 'Không thể gửi Chat Thế Giới'));
   GL.socket.on('game_guild_chat_message', ({ userId, name, text }) => {
     GL.guildChatHistory.push({ userId, name, text });
     while (GL.guildChatHistory.length > 60) GL.guildChatHistory.shift();

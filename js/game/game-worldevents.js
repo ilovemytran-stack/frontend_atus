@@ -49,6 +49,7 @@ GL.initWorldEventsSocket = function () {
       GL.lastBossAlert = info;
       GL.toast(`Chaoseraph xuất hiện tại ${info.continentName} · ${info.mapName}!`, 'gl-toast-levelup', 'crown');
       document.getElementById('glNotifDot').style.display = 'block';
+      GL.requestBossStatus(); // đồng bộ lastBossStatus ngay, không đợi người chơi tự mở bảng thông báo
     } else {
       GL.lastBossAlert = null;
     }
