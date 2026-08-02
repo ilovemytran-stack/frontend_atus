@@ -1,6 +1,5 @@
-const CACHE = 'socialshop-v6'; // v6 (2026-08-01): bump vì đã gỡ liquid-glass khỏi hầu hết trang + đổi
-// query ?v= của global.css/feed.css/layout.js/api.js... — máy nào đang giữ cache CŨ (kể cả từ trước v5)
-// phải bỏ hết, lấy lại bản mới hoàn toàn thay vì chỉ giữ 4 file trong STATIC dưới đây.
+const CACHE = 'socialshop-v5'; // v5: bump để buộc mọi máy đang giữ global.css/feed.css/api.js/layout.js
+// cũ (từ trước khi sửa layout mobile-first) phải bỏ cache đó và lấy lại bản mới.
 const STATIC = ['/css/global.css', '/css/feed.css', '/js/api.js', '/js/layout.js', '/manifest.json'];
 
 self.addEventListener('install', e => {

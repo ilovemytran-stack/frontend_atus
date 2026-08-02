@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>G.Legendary — SocialShop</title>
-<link rel="stylesheet" href="/css/global.css?v=20260801">
+<link rel="stylesheet" href="/css/global.css?v=20260726">
+<link rel="stylesheet" href="/css/liquid-glass.css?v=20260726">
 <link rel="stylesheet" href="/css/game.css">
 <link rel="manifest" href="/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -135,9 +136,6 @@
     <button class="gl-icon-btn" id="glBtnNotif" title="Thông báo"><svg class="gl-icon"><use href="#i-bell"/></svg><span class="gl-notif-dot" id="glNotifDot" style="display:none"></span></button>
   </div>
 
-  <!-- Bảng Chat Thế Giới nổi — góc trên phải, mỗi dòng tự ẩn sau 15s -->
-  <div class="gl-worldchat-ticker" id="glWorldChatTicker"></div>
-
   <!-- Góc dưới trái: joystick di chuyển -->
   <div class="gl-joystick-zone" id="glJoyZone">
     <div class="gl-joystick-base" id="glJoyBase"><div class="gl-joystick-stick" id="glJoyStick"></div></div>
@@ -152,8 +150,9 @@
     <button class="gl-attack-btn" id="glAttackBtn">ĐÁNH</button>
   </div>
 
-  <!-- Nút mở bảng Pet (chỉ hiện khi đã có ít nhất 1 pet) -->
-  <button class="gl-icon-btn gl-pet-btn" id="glBtnPet" title="Pet" style="display:none"><svg class="gl-icon"><use href="#i-paw"/></svg></button>
+  <!-- Pet: dùng mục "Pet" trong menu hamburger (data-open="glPanelPet") — bỏ nút nổi riêng vì từng
+       đè lên góc phải của .gl-topbar (topbar canh giữa + max-width 78vw nên mép phải của nó biến động
+       theo bề rộng màn hình, nút nổi cố định theo "right:" dễ chồng lên nó ở màn hình hẹp). -->
 
   <!-- Người chơi khác / chat nhanh trong map -->
   <div class="gl-maplabel" id="glMapLabel" role="button">—</div>
@@ -243,14 +242,18 @@
   <div class="gl-panel">
     <div class="gl-panel-head"><span><svg class="gl-icon"><use href="#i-globe"/></svg> CHAT THẾ GIỚI</span><button class="gl-panel-close" data-close><svg class="gl-icon"><use href="#i-x"/></svg></button></div>
     <div class="gl-panel-body" style="display:flex;flex-direction:column;height:100%">
+      <div style="font-size:.68rem;color:var(--gl-gold-2);margin-bottom:6px"><svg class="gl-icon-sm"><use href="#i-gem"/></svg> Mỗi lần gửi tốn 100 Ngọc — hiện ra bảng góc phải màn hình, tự ẩn sau 15 giây.</div>
       <div id="glWorldChatLog" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-size:.72rem;padding-bottom:8px"></div>
       <div style="display:flex;gap:6px;flex:0 0 auto">
-        <input id="glWorldChatInput" maxlength="140" placeholder="Nhắn với toàn server…" style="flex:1;background:rgba(8,7,14,.7);border:1px solid var(--gl-gold-dim);border-radius:99px;padding:8px 14px;color:#fff;font-size:.75rem">
-        <button id="glWorldChatSend" class="gl-btn-sm" title="Tốn 100 Ngọc mỗi lần gửi">Gửi · 100💎</button>
+        <input id="glWorldChatInput" maxlength="140" placeholder="Nhắn với toàn server… (100 Ngọc)" style="flex:1;background:rgba(8,7,14,.7);border:1px solid var(--gl-gold-dim);border-radius:99px;padding:8px 14px;color:#fff;font-size:.75rem">
+        <button id="glWorldChatSend" class="gl-btn-sm">Gửi</button>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Bảng Chat Thế Giới góc phải trên — LUÔN hiện (không cần mở panel), mỗi dòng tự ẩn sau 15s -->
+<div class="gl-worldchat-ticker" id="glWorldChatTicker"></div>
 
 <!-- Panel: Bang Hội -->
 <div class="gl-panel-overlay" id="glPanelGuild" style="display:none">
@@ -379,7 +382,7 @@
 
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="/js/api.js?v=20260801"></script>
+<script src="/js/api.js?v=20260726"></script>
 <script src="/js/game/game-three-bg.js"></script>
 <script src="/js/game/game-data-cache.js"></script>
 <script src="/js/game/game-render.js"></script>

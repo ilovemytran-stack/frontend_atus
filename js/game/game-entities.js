@@ -6,14 +6,14 @@
 GL.WORLD = { w: 3200, h: 220, pad: 100 };
 GL.GROUND_Y = 150; // đường "mặt đất" cố định — nhân vật/quái/NPC luôn đứng trên đường này
 
-// x dời hẳn sang phải (900-1420), tách khỏi vùng spawn mặc định (400) / vào map từ mép trái (124) —
-// trước đây NPC nằm ngay chỗ camera căn giữa lúc mới vào map, trùng vùng joystick trái nên chạm hụt.
+// Đặt NPC lệch hẳn về BÊN PHẢI điểm xuất phát (spawn ~x400) — dù joystick giờ đã ưu tiên bắt trúng
+// NPC trước khi mở (xem GL.tryInteractAt), vẫn xếp NPC xa khu vực joystick hay dùng nhất cho chắc ăn.
 GL.NPC_DEFS = [
-  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: 'scroll', x: 900, y: GL.GROUND_Y, kind: 'quest' },
-  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: 'portal', x: 1030, y: GL.GROUND_Y, kind: 'portal' },
-  { id: 'npc_potion', name: 'Dược Sư', icon: 'flask', x: 1160, y: GL.GROUND_Y, kind: 'potion' },
-  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: 'sword', x: 1290, y: GL.GROUND_Y, kind: 'weapon' },
-  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: 'shield', x: 1420, y: GL.GROUND_Y, kind: 'armor' },
+  { id: 'npc_quest', name: 'Trưởng Lão Nhiệm Vụ', icon: 'scroll', x: 560, y: GL.GROUND_Y, kind: 'quest' },
+  { id: 'npc_portal', name: 'Người Dẫn Đường', icon: 'portal', x: 700, y: GL.GROUND_Y, kind: 'portal' },
+  { id: 'npc_potion', name: 'Dược Sư', icon: 'flask', x: 840, y: GL.GROUND_Y, kind: 'potion' },
+  { id: 'npc_weapon', name: 'Thợ Rèn Vũ Khí', icon: 'sword', x: 980, y: GL.GROUND_Y, kind: 'weapon' },
+  { id: 'npc_armor', name: 'Thợ Rèn Giáp', icon: 'shield', x: 1120, y: GL.GROUND_Y, kind: 'armor' },
 ];
 
 // Rắc điểm dọc theo 1 đường ngang, cách đều + rung nhẹ (thay cho lưới 2D cũ)
@@ -32,7 +32,7 @@ GL.spawnMonsters = function (map) {
   const list = [];
   if (!map.monsterIds.length) { GL.monsters = list; return list; }
   const count = Math.min(map.maxMonsters || 10, 10);
-  const npcZoneEnd = map.role === 'hub' ? 1500 : 200; // né khu NPC nếu là map hub (đã dời NPC ra x:900-1420)
+  const npcZoneEnd = map.role === 'hub' ? 760 : 200; // né khu NPC nếu là map hub
   const pts = jitteredLine(count, npcZoneEnd, GL.WORLD.w - 100);
   const lvl = map.levelRange[1];
   pts.forEach((p, i) => {
@@ -56,10 +56,7 @@ GL.spawnMonsters = function (map) {
       uid: 'm' + i + '_' + Date.now(),
       defId: monsterId, def, isBoss,
       x: p.x, y: p.y, homeX: p.x, homeY: p.y,
-      // armor (không phải "def" — trùng tên với def ở trên = object nameVN/color/shape, bị số này ĐÈ MẤT,
-      // khiến mọi nhãn tên quái hiển thị chữ "undefined" thay vì tên thật; đã sửa hết chỗ đọc .def làm
-      // giáp sang .armor bên dưới)
-      hp: scaled.hp, maxHp: scaled.hp, atk: scaled.atk, armor: scaled.def,
+      hp: scaled.hp, maxHp: scaled.hp, atk: scaled.atk, def: scaled.def,
       xp: scaled.xp, goldMin: scaled.goldMin, goldMax: scaled.goldMax, gemChance: scaled.gemChance,
       state: 'idle', dir: 1, attackTimer: 0, alive: true, respawnAt: 0,
     });
@@ -114,6 +111,18 @@ GL.spawnDamageNumber = function (worldX, worldY, text, cls) {
 };
 
 // cập nhật AI quái mỗi frame (dt = giây) — nhắm vào mục tiêu gần nhất theo trục ngang: người chơi HOẶC thú triệu hồi
+// Quái "đánh xa" (caster/archer, ~1/3 số quái) đứng lại bắn từ khoảng cách thay vì lao vào cận chiến
+// như "đánh gần" (knight/beast) — làm rõ khác biệt lối đánh giữa các loại quái theo đúng yêu cầu.
+const RANGED_SHAPES = new Set(['caster', 'archer']);
+function attackRangeFor(m) {
+  if (m.isBoss) return 46; // boss (guardian) vẫn cận chiến hết — chưa có shape riêng cho boss
+  return RANGED_SHAPES.has(m.def.shape) ? 165 : 42;
+}
+
+GL.spawnProjectile = function (x1, y1, x2, y2, color) {
+  GL.projectiles.push({ x1, y1, x2, y2, color: color || '#F5D061', spawnedAt: performance.now(), duration: 220 });
+};
+
 GL.updateMonsters = function (dt, now) {
   const p = GL.player;
   GL.monsters.forEach((m) => {
@@ -126,6 +135,7 @@ GL.updateMonsters = function (dt, now) {
     if (m.stunnedUntil && performance.now() < m.stunnedUntil) return; // choáng do Chiêu 3 V1 của pet — đứng im, không đánh/đuổi
     let target = p, bestD = GL.distX(m, p);
     (GL.summons || []).forEach((s) => { if (!s.alive) return; const d = GL.distX(m, s); if (d < bestD) { target = s; bestD = d; } });
+    const atkRange = attackRangeFor(m);
 
     if (m.state !== 'attack') {
       const leashDist = m.isBoss ? 400 : 260; // trần khoảng cách được dụ đi xa khỏi điểm gốc — quái/boss không bị kéo xuyên bản đồ
@@ -133,7 +143,8 @@ GL.updateMonsters = function (dt, now) {
         m.state = 'chase';
         const dirX = target.x >= m.x ? 1 : -1;
         const spd = m.isBoss ? 55 : 70;
-        if (bestD > 34) { m.x += dirX * spd * dt; m.dir = dirX; }
+        // Quái đánh xa DỪNG LẠI ngay khi vào tầm bắn thay vì lao vào cận chiến như quái đánh gần.
+        if (bestD > atkRange) { m.x += dirX * spd * dt; m.dir = dirX; } else { m.dir = dirX; }
       } else if (bestD > 220 || Math.abs(m.x - m.homeX) >= leashDist) {
         const dirX = m.homeX >= m.x ? 1 : -1;
         if (Math.abs(m.x - m.homeX) > 6) { m.x += dirX * 40 * dt; }
@@ -141,12 +152,13 @@ GL.updateMonsters = function (dt, now) {
       }
     }
     m.attackTimer -= dt;
-    if (bestD < 42 && m.attackTimer <= 0) {
-      m.attackTimer = 1.2;
-      const targetDef = target === p ? GL.currentStats().def : target.armor;
+    if (bestD < atkRange && m.attackTimer <= 0) {
+      m.attackTimer = RANGED_SHAPES.has(m.def.shape) ? 1.6 : 1.2; // đánh xa hồi chiêu lâu hơn 1 chút để bù lại lợi thế đứng an toàn
+      const targetDef = target === p ? GL.currentStats().def : target.def;
       const { dmg, crit } = GL.rollDamage(m.atk, targetDef, 5);
       if (target === p) GL.damagePlayer(dmg); else GL.damageSummon(target, dmg);
       GL.spawnDamageNumber(target.x, target.y - 30, '-' + dmg, crit ? 'gl-crit' : '');
+      if (!m.isBoss && RANGED_SHAPES.has(m.def.shape)) GL.spawnProjectile(m.x, m.y - 30, target.x, target.y - 30, m.def.color);
     }
   });
 };
@@ -164,7 +176,7 @@ GL.spawnSummon = function (defId, skillId, duration) {
   GL.summons.push({
     uid: 's' + Date.now() + Math.random(), defId, def,
     x: GL.player.x + 34, y: GL.GROUND_Y, dir: 1,
-    hp, maxHp: hp, atk, armor: defStat, speed: def.speed, // armor không phải "def" — cùng lý do đã sửa ở GL.spawnMonsters
+    hp, maxHp: hp, atk, def: defStat, speed: def.speed,
     expiresAt: performance.now() + duration * 1000, state: 'idle', attackTimer: 0, alive: true,
   });
 };
@@ -185,7 +197,7 @@ GL.updateSummons = function (dt, now) {
         s.x += dirX * s.speed * dt; s.dir = dirX; s.state = 'chase';
       } else {
         s.state = 'attack'; s.attackTimer -= dt;
-        if (s.attackTimer <= 0) { s.attackTimer = 1.1; const dmgInfo = GL.rollDamage(s.atk, target.armor, 5); GL.applyMonsterHit(target, dmgInfo); }
+        if (s.attackTimer <= 0) { s.attackTimer = 1.1; const dmgInfo = GL.rollDamage(s.atk, target.def, 5); GL.applyMonsterHit(target, dmgInfo); }
       }
     } else {
       const d = GL.distX(s, GL.player);
@@ -202,10 +214,7 @@ GL.updateSummons = function (dt, now) {
 // có 3 chế độ đổi qua chat (def/atk/fl) hoặc bảng Pet, và có tối đa 3 chiêu mở dần theo level (đồng bộ
 // theo char.level, xem GL.data.petSkill2Versions/petSkill3Versions/petSkill4).
 // LƯU Ý ĐẶT TÊN: `defObj` = object định nghĩa loại pet (tên/portrait/frameCount, từ GL.data.pets), còn
-// `def` (không có Obj) = CHỈ SỐ PHÒNG THỦ — pet vốn đã tách đúng 2 tên riêng biệt như vậy. Quái/summon
-// TRƯỚC ĐÂY dùng chung "def" cho cả object định nghĩa (nameVN/color/shape) LẪN chỉ số phòng thủ, số
-// đè mất object khiến mọi nhãn tên hiện "undefined" — đã đổi chỉ số phòng thủ của quái/summon sang
-// `armor` (m.armor, s.armor) để không còn trùng tên với `def`/`defObj` (object định nghĩa) nữa.
+// `def` (không có Obj) = CHỈ SỐ PHÒNG THỦ, đúng quy ước đang dùng cho quái/summon (m.def, s.def...).
 GL.spawnPetsFromChar = function (opts = {}) {
   const fresh = !!opts.fresh; // true khi mới vào game / vừa đổi map -> đặt lại vị trí cạnh chủ + đầy HP
   const list = (GL.char.pets || []).map((p, idx) => {
@@ -258,7 +267,7 @@ function petSkillMultCd(pet) {
 // Chiêu 2 (tầm xa, "chưởng") — bắn thẳng vào mục tiêu hiện tại, không cần lại gần
 function petCastSkill2(pet, target, s2) {
   pet.skill2Cd = s2.cd;
-  const dmgInfo = GL.rollDamage(pet.atk * s2.mult * GL.auraDmgMult(), target.armor || 0, 5);
+  const dmgInfo = GL.rollDamage(pet.atk * s2.mult * GL.auraDmgMult(), target.def || 0, 5);
   if (target === 'boss') { GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg }); GL.spawnDamageNumber(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y - 50, dmgInfo.dmg, 'gl-crit'); }
   else GL.applyMonsterHit(target, dmgInfo);
   GL.spawnDamageNumber(pet.x, pet.y - 40, 'Chưởng!', '');
@@ -340,7 +349,7 @@ GL.updatePets = function (dt, now) {
       pet.state = 'attack'; pet.attackTimer -= dt;
       if (pet.attackTimer <= 0) {
         pet.attackTimer = 0.9;
-        const dmgInfo = GL.rollDamage(pet.atk * GL.auraDmgMult(), target === 'boss' ? 0 : target.armor, 8);
+        const dmgInfo = GL.rollDamage(pet.atk * GL.auraDmgMult(), target === 'boss' ? 0 : target.def, 8);
         if (target === 'boss') { GL.socketEmit('world_boss_attack', { mapId: GL.map.id, zone: GL.player.zone, dmg: dmgInfo.dmg }); GL.spawnDamageNumber(GL.BOSS_SPOT.x, GL.BOSS_SPOT.y - 40, dmgInfo.dmg, dmgInfo.crit ? 'gl-crit' : ''); }
         else GL.applyMonsterHit(target, dmgInfo);
       }

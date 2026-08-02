@@ -85,15 +85,7 @@ function enterGame() {
   GL.joinMap(startMap);
 
   document.getElementById('glCanvas').addEventListener('pointerup', (e) => {
-    const wx = e.clientX + GL.camera.x, wy = e.clientY + GL.camera.y;
-    if (GL.map?.role === 'hub') {
-      const npcHit = GL.NPC_DEFS.find((n) => Math.hypot(n.x - wx, n.y - wy) < 26);
-      if (npcHit) { GL.openNpc(npcHit); return; }
-    }
-    if (GL.worldBoss && Math.hypot(GL.BOSS_SPOT.x - wx, GL.BOSS_SPOT.y - wy) < 60) { GL.selectTarget(GL.worldBoss); return; }
-    const monsterHit = GL.monsters.find((m) => m.alive && Math.hypot(m.x - wx, m.y - wy) < 34);
-    if (monsterHit) { GL.selectTarget(monsterHit); return; }
-    GL.clearTarget();
+    GL.tryInteractAt(e.clientX, e.clientY);
   });
 
   requestAnimationFrame(loop);
@@ -153,7 +145,7 @@ function updatePlayerMovement(dt) {
   // mô hình cuộn ngang 1 trục cho va chạm/tấn công, "nhảy" chỉ là hiệu ứng hiển thị (player.z ở game-render.js).
   const stats = GL.currentStats();
   const spdBuffMult = performance.now() < (GL.player.buffSpdUntil || 0) ? 1 + (GL.player.buffSpdPct || 0) : 1;
-  const speed = (95 + stats.spd * 14) * spdBuffMult;
+  const speed = (118 + stats.spd * 14) * spdBuffMult; // tăng tốc độ nền lên ~25% cho đỡ ì (từ 95 lên 118)
   GL.player.y = GL.GROUND_Y; // luôn đứng trên đường ground, không roaming tự do nữa
   const dashing = performance.now() < (GL.player.dashUntil || 0);
   if (dashing) {

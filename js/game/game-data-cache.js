@@ -28,6 +28,7 @@ window.GL = {
   auraDmgBuffUntil: 0,   // performance.now() timestamp còn hiệu lực +8% sát thương (mục pulse Aura)
   nearbyAuraPulses: [],  // { userId, x, y, until } các "tiếng vang" Aura của người khác gần đây còn hiệu lực hiển thị
   deathFx: [],            // { category, defId, x, y, dir, until } quái vừa chết — chơi animation death rồi tự biến mất
+  projectiles: [],        // { x1,y1,x2,y2, color, spawnedAt } hiệu ứng đường bắn của quái đánh xa (caster/archer)
 };
 // GL.WORLD và GL.GROUND_Y được định nghĩa trong game-entities.js (mô hình hành lang ngang)
 

@@ -74,29 +74,28 @@ GL.setChatBubble = function (userId, text) {
   entity.chatBubble = { text, until: performance.now() + GL.CHAT_BUBBLE_MS };
 };
 
-GL.appendWorldChat = function (name, text, mine) {
-  const safeText = text.replace(/</g, '&lt;');
+GL.appendWorldChat = function (name, text, mine, expiresAt) {
+  // Bảng góc phải trên — LUÔN hiện, không cần mở panel (xem game.html #glWorldChatTicker)
+  const ticker = document.getElementById('glWorldChatTicker');
+  if (ticker) {
+    const row = document.createElement('div');
+    row.className = 'gl-worldchat-row';
+    row.innerHTML = `<b style="${mine ? 'color:var(--gl-gold)' : ''}">${name}:</b> ${String(text).replace(/</g, '&lt;')}`;
+    ticker.appendChild(row);
+    while (ticker.children.length > 6) ticker.removeChild(ticker.firstChild); // tối đa 6 dòng cùng lúc cho đỡ choán màn hình
+    const life = Math.max(500, (expiresAt || Date.now() + 15000) - Date.now());
+    setTimeout(() => { row.classList.add('gl-wc-out'); setTimeout(() => row.remove(), 360); }, life);
+  }
+  // Panel mở ra (nếu có) vẫn giữ log cuộn được như trước, cho ai muốn xem lại lịch sử gần đây
   const log = document.getElementById('glWorldChatLog');
-  const line = document.createElement('div');
-  line.innerHTML = `<b style="color:${mine ? 'var(--gl-gold-2)' : '#cfd6ff'}">${name}:</b> ${safeText}`;
-  log.appendChild(line);
-  while (log.children.length > 60) log.removeChild(log.firstChild);
-  log.scrollTop = log.scrollHeight;
+  if (log) {
+    const line = document.createElement('div');
+    line.innerHTML = `<b style="color:${mine ? 'var(--gl-gold-2)' : '#cfd6ff'}">${name}:</b> ${String(text).replace(/</g, '&lt;')}`;
+    log.appendChild(line);
+    while (log.children.length > 60) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
   if (!GL.worldChatPanelOpen && !mine) GL.toast(`${name}: ${text.length > 30 ? text.slice(0, 30) + '…' : text}`, '', 'globe');
-  GL.pushWorldChatTicker(name, safeText, mine);
-};
-
-// Bảng chat thế giới nổi góc trên-phải màn hình — mỗi dòng tự biến mất sau 15s, độc lập với panel chat đầy đủ
-GL.pushWorldChatTicker = function (name, safeText, mine) {
-  const table = document.getElementById('glWorldChatTicker');
-  if (!table) return;
-  const row = document.createElement('div');
-  row.className = 'gl-wct-row';
-  row.innerHTML = `<span class="gl-wct-name" style="color:${mine ? 'var(--gl-gold-2)' : '#8fe3ff'}">${name}</span><span class="gl-wct-text">${safeText}</span>`;
-  table.appendChild(row);
-  while (table.children.length > 6) table.removeChild(table.firstChild);
-  requestAnimationFrame(() => row.classList.add('gl-wct-in'));
-  setTimeout(() => { row.classList.add('gl-wct-out'); setTimeout(() => row.remove(), 320); }, 15000);
 };
 
 GL.guildChatHistory = [];
@@ -118,16 +117,17 @@ function sendGuildChat() {
 }
 
 // ---------- Panel helpers ----------
+// Đóng bằng nút [X] (data-close) HOẶC bấm ra vùng nền mờ bên ngoài panel — dùng CẢ 'click' lẫn
+// 'pointerdown' vì trên di động đôi khi 'click' bị các listener 'pointerdown/pointerup' khác trong
+// game (joystick, nút hành động...) nuốt mất nếu ngón tay lướt nhẹ qua trong lúc chạm.
 function openPanel(id) { document.getElementById(id).style.display = 'flex'; }
 function closePanel(id) { document.getElementById(id).style.display = 'none'; if (id === 'glPanelWorldChat') GL.worldChatPanelOpen = false; }
-document.addEventListener('click', (e) => {
-  // dùng closest() thay vì matches() trực tiếp trên e.target — nút [X] chứa <svg><use>, nên khi
-  // chạm vào icon thì e.target là svg/use (không có data-close), không phải chính <button data-close>,
-  // khiến nút bấm không phản hồi và chỉ bấm ra ngoài overlay mới đóng được (bug đã báo).
-  const closeBtn = e.target.closest('[data-close]');
-  if (closeBtn) { const overlay = closeBtn.closest('.gl-panel-overlay'); if (overlay) closePanel(overlay.id); return; }
+function handleOutsideClose(e) {
+  if (e.target.matches('[data-close]') || e.target.closest('[data-close]')) { closePanel(e.target.closest('.gl-panel-overlay').id); return; }
   if (e.target.matches('.gl-panel-overlay')) closePanel(e.target.id);
-});
+}
+document.addEventListener('click', handleOutsideClose);
+document.addEventListener('pointerdown', (e) => { if (e.target.matches('.gl-panel-overlay')) closePanel(e.target.id); });
 
 // ---------- Hành trang / trang bị / thuộc tính / kỹ năng ----------
 function itemIconFor(kind, def) {
@@ -296,8 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (res?.success) {
           GL.char = res.character; GL.updateVitalsUI(); renderInventoryPanel('equip'); Toast.success('Đã trang bị');
           if (!hadFullSuperSet && res.character.stats?.hasFullSuperSet) GL.playSuperSetTransform();
-        }
-        else Toast.error(res?.message || 'Không thể trang bị');
+        } else Toast.error(res?.message || 'Không thể trang bị');
       }
       return;
     }
@@ -615,7 +614,7 @@ function renderNotifPanel() {
       Toast.success('Đã dịch chuyển đến chỗ Chaoseraph!');
     }
   };
-  document.getElementById('glNotifDot').style.display = (claimable.length || mails.length || duels.length || GL.lastBossStatus?.active) ? 'block' : 'none';
+  document.getElementById('glNotifDot').style.display = (claimable.length || mails.length || duels.length) ? 'block' : 'none';
 }
 
 // ---------- NPC ----------

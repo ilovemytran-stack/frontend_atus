@@ -1,17 +1,9 @@
-// LIQUID GLASS — hiệu ứng "ánh sáng bám theo con trỏ" + "gợn sóng khi bấm"
-// cho các phần tử .glass/.glass-card/.glass-btn/.glass-sidebar/.glass-topbar.
+// Gợn sóng nhẹ khi bấm cho .glass-btn (phản hồi chạm thông thường, không còn
+// hiệu ứng "ánh sáng bám con trỏ" của bản kính mờ cũ vì .glass giờ là mặt phẳng đặc).
 // Tự tắt hoàn toàn nếu người dùng bật "giảm chuyển động".
 (function () {
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduceMotion) return;
-
-  function attachGlow(el) {
-    el.addEventListener('pointermove', function (e) {
-      var r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
-      el.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
-    });
-  }
 
   function attachRipple(el) {
     el.addEventListener('pointerdown', function (e) {
@@ -30,7 +22,6 @@
   }
 
   function init() {
-    document.querySelectorAll('.glass, .glass-card, .glass-sidebar, .glass-topbar').forEach(attachGlow);
     document.querySelectorAll('.glass-btn').forEach(attachRipple);
   }
 
@@ -43,12 +34,8 @@
     mutations.forEach(function (m) {
       m.addedNodes.forEach(function (node) {
         if (node.nodeType !== 1) return;
-        if (node.matches && node.matches('.glass, .glass-card, .glass-sidebar, .glass-topbar')) attachGlow(node);
         if (node.matches && node.matches('.glass-btn')) attachRipple(node);
-        if (node.querySelectorAll) {
-          node.querySelectorAll('.glass, .glass-card, .glass-sidebar, .glass-topbar').forEach(attachGlow);
-          node.querySelectorAll('.glass-btn').forEach(attachRipple);
-        }
+        if (node.querySelectorAll) node.querySelectorAll('.glass-btn').forEach(attachRipple);
       });
     });
   });

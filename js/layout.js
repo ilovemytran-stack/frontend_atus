@@ -100,7 +100,7 @@ class Layout {
       </div>
       <nav class="sidebar-nav">
         ${navItems.map(i => `
-          <a href="${i.href}"${i.onclick ? ` onclick="${i.onclick}"` : ''} class="sidebar-item glass-btn ${current === i.href.split('?')[0] ? 'active lg-active-glow' : ''} ${i.gameNew ? 'sidebar-item-game' : ''}">
+          <a href="${i.href}"${i.onclick ? ` onclick="${i.onclick}"` : ''} class="sidebar-item glass-btn ${current === i.href ? 'active lg-active-glow' : ''} ${i.gameNew ? 'sidebar-item-game' : ''}">
             <span class="sidebar-icon">${i.icon}</span>
             <span class="sidebar-label">${i.label}</span>
             ${i.badge === 'notif' ? '<span class="sidebar-badge" id="notif-badge" style="display:none">0</span>' : ''}
@@ -139,7 +139,7 @@ class Layout {
       { href: user ? `profile.html?u=${user.username}` : 'login.html', icon: user?.avatar ? `<img src="${user.avatar}" class="avatar avatar-xs" alt="">` : Icon.user, label: 'Cá nhân' },
     ];
     nav.innerHTML = items.map(i => `
-      <a href="${i.href}" class="bottom-nav-item glass-btn ${current === i.href.split('?')[0] ? 'active lg-active-glow' : ''}">
+      <a href="${i.href}" class="bottom-nav-item glass-btn ${current === i.href ? 'active lg-active-glow' : ''}">
         <span class="icon">${i.icon}</span>
         <span>${i.label}</span>
       </a>`).join('')

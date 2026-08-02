@@ -11,7 +11,8 @@
 <meta name="apple-mobile-web-app-title" content="Public">
 <meta name="theme-color" content="#F1F0FA">
 <link rel="apple-touch-icon" href="/icon-192.png">
-<link rel="stylesheet" href="/css/global.css?v=20260801">
+<link rel="stylesheet" href="/css/global.css?v=20260726">
+<link rel="stylesheet" href="/css/liquid-glass.css?v=20260726">
 <link rel="stylesheet" href="/css/motion-simulation.css">
 <link rel="stylesheet" href="/css/feed.css">
 <style>
@@ -24,7 +25,6 @@
 .admin-tabs { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .admin-tab { padding: 10px 16px; font-weight: 600; font-size: 0.9rem; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
 .admin-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
-.tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--radius-full); background: var(--accent-red, #ef4444); color: #fff; font-size: 0.68rem; font-weight: 800; margin-left: 4px; vertical-align: 2px; }
 .admin-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
 .admin-toolbar .input { max-width: 280px; }
 .admin-table-wrap { overflow-x: auto; }
@@ -67,7 +67,8 @@
     <div class="admin-tab" data-tab="posts"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M4 20l1-4L16 5l3 3L8 19l-4 1z/><path d=M14 7l3 3/></svg> Bài viết</div>
     <div class="admin-tab" data-tab="videos"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x=2 y=5 width=15 height=14 rx=2/><path d=M17 10l5-3v10l-5-3z/></svg> Video</div>
     <div class="admin-tab" data-tab="gmgame"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x=2 y=7 width=20 height=12 rx=3/><path d=M7 12h.01M5 10v4/><path d=M4 12h2/><circle cx=16 cy=11 r=1/><circle cx=18 cy=13 r=1/></svg> GM Game</div>
-    <div class="admin-tab" data-tab="shop"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z/><path d=M3 6h18/><path d=M16 10a4 4 0 0 1-8 0/></svg> Duyệt Shop <span id="shopPendingBadge" class="tab-badge" style="display:none"></span></div>
+    <div class="admin-tab" data-tab="gamedb"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><ellipse cx=12 cy=5 rx=9 ry=3/><path d=M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5/><path d=M3 12c0 1.66 4 3 9 3s9-1.34 9-3/></svg> Dữ Liệu Game</div>
+    <div class="admin-tab" data-tab="shopmod"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M9 11l3 3L22 4/><path d=M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11/></svg> Duyệt Sản Phẩm</div>
     <div class="admin-tab" data-tab="announcements"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d=M3 11l18-5v12L3 14v-3z/><path d=M11.6 16.8L13 21l3-1-1.4-4.2/></svg> Thông Báo</div>
   </div>
 
@@ -107,7 +108,20 @@
   </div>
 
   <div id="panel-gmgame" class="admin-panel" style="display:none">
-    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Công cụ GM để test game: tìm nhân vật theo tên, chỉnh cấp/tiền/buff sát thương, đánh dấu hoàn thành nhiệm vụ.</div>
+    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Công cụ GM để test game: tìm nhân vật theo tên, chỉnh cấp/tiền/buff sát thương, đánh dấu hoàn thành nhiệm vụ. Bấm "Chọn làm mục tiêu" trên 1 nhân vật để dùng cho ô lệnh console bên dưới.</div>
+
+    <div class="glass-card" style="padding:14px;margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:6px">Console lệnh GM — mục tiêu hiện tại: <span id="gmTargetLabel" style="color:var(--brand)">chưa chọn</span></div>
+      <div style="color:var(--text-muted);font-size:0.76rem;margin-bottom:8px">
+        <code>buff [id] [số lượng]</code> · <code>hp/mp/damage/armor [số lượng]</code> (số âm để giảm) · <code>rs</code> (reset, tự lưu bản trước) · <code>re1</code> (khôi phục lần reset gần nhất) · <code>del [id] [user id] [số lượng]</code> (user id để trống = dùng mục tiêu đang chọn)
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="input" id="gmConsoleInput" placeholder="vd: buff pet_ghost 1" style="flex:1;font-family:monospace" onkeydown="if(event.key==='Enter')runGmConsole()">
+        <button class="btn btn-primary btn-sm" onclick="runGmConsole()">Chạy</button>
+      </div>
+      <div id="gmConsoleLog" style="margin-top:10px;font-family:monospace;font-size:0.78rem;max-height:160px;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:4px"></div>
+    </div>
+
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead><tr><th>Nhân vật</th><th>Tài khoản</th><th>Class</th><th>Cấp</th><th>Vàng/Ngọc</th><th>Buff Dame</th><th>Hành động</th></tr></thead>
@@ -116,12 +130,18 @@
     </div>
   </div>
 
-  <div id="panel-shop" class="admin-panel" style="display:none">
-    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Sản phẩm người bán vừa đăng ở Root Shop chờ duyệt — chỉ hiển thị công khai sau khi được chấp thuận ở đây.</div>
+  <div id="panel-gamedb" class="admin-panel" style="display:none">
+    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Toàn bộ id vũ khí/giáp/vật phẩm/quái/boss/pet/thú triệu hồi trong G.Legendary — sửa xong có hiệu lực ngay, không cần khởi động lại server.</div>
+    <div class="admin-tabs" id="gamedbCatTabs" style="border-bottom:none;margin-bottom:10px"></div>
+    <div class="admin-table-wrap"><table class="admin-table"><thead><tr id="gamedbThead"></tr></thead><tbody id="gamedbTbody"></tbody></table></div>
+  </div>
+
+  <div id="panel-shopmod" class="admin-panel" style="display:none">
+    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Sản phẩm người bán vừa đăng — cần duyệt mới hiển thị công khai trên Root Shop.</div>
     <div class="admin-table-wrap">
       <table class="admin-table">
-        <thead><tr><th>Sản phẩm</th><th>Người bán</th><th>Danh mục</th><th>Giá</th><th>Đăng lúc</th><th>Hành động</th></tr></thead>
-        <tbody id="shopPendingTbody"></tbody>
+        <thead><tr><th>Sản phẩm</th><th>Người bán</th><th>Danh mục</th><th>Giá</th><th>Ngày đăng</th><th>Hành động</th></tr></thead>
+        <tbody id="shopModTbody"></tbody>
       </table>
     </div>
   </div>
@@ -157,8 +177,9 @@
 <div id="toast-container"></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="/js/three-orb.js"></script>
-<script src="/js/api.js?v=20260801"></script>
-<script src="/js/layout.js?v=20260801"></script>
+<script src="/js/api.js?v=20260726"></script>
+<script src="/js/layout.js?v=20260726"></script>
+<script src="/js/liquid-glass.js?v=20260726"></script>
 <script type="module" src="/js/motion-simulation.js"></script>
 <script>
 const state = { tab: 'users', page: { users: 1, posts: 1, videos: 1 }, search: '' };
@@ -176,7 +197,6 @@ async function checkAccessAndInit() {
   document.getElementById('adminContent').style.display = 'block';
   await loadStats();
   await loadUsers();
-  refreshShopPendingBadge();
 
   document.getElementById('annConfirmBtn').addEventListener('click', submitAnnouncement);
   document.getElementById('annCloseBtn').addEventListener('click', () => { document.getElementById('annText').value = ''; });
@@ -209,7 +229,8 @@ function loadTab(tab) {
   if (tab === 'posts') return loadPosts();
   if (tab === 'videos') return loadVideos();
   if (tab === 'gmgame') return loadGmChars();
-  if (tab === 'shop') return loadShopPending();
+  if (tab === 'gamedb') return loadGameDb();
+  if (tab === 'shopmod') return loadShopMod();
   if (tab === 'announcements') return loadAnnouncements();
 }
 
@@ -366,6 +387,7 @@ async function loadGmChars() {
       <td>${(c.gold||0).toLocaleString()} Vàng / ${(c.gem||0).toLocaleString()} Ngọc</td>
       <td>${c.gmDamageMultiplier && c.gmDamageMultiplier !== 1 ? `x${c.gmDamageMultiplier}` : '—'}</td>
       <td><div class="admin-actions">
+        <button class="btn btn-sm btn-primary" onclick="gmSelectTarget('${c._id}','${esc(c.name)}')">Chọn làm mục tiêu</button>
         <button class="btn btn-sm btn-secondary" onclick="gmSetLevel('${c._id}','${esc(c.name)}',${c.level})">Cấp</button>
         <button class="btn btn-sm btn-secondary" onclick="gmCurrency('${c._id}','${esc(c.name)}')">Tiền</button>
         <button class="btn btn-sm btn-secondary" onclick="gmDamageBuff('${c._id}','${esc(c.name)}',${c.gmDamageMultiplier||1})">Buff Dame</button>
@@ -407,6 +429,94 @@ async function gmCompleteQuests(id, name) {
   if (res?.success) Toast.success(res.message); else Toast.error(res?.message || 'Lỗi');
 }
 
+// ---- Console lệnh GM ----
+function gmSelectTarget(id, name) {
+  state.gmTargetId = id;
+  document.getElementById('gmTargetLabel').textContent = name;
+  document.getElementById('gmConsoleInput').focus();
+}
+async function runGmConsole() {
+  const input = document.getElementById('gmConsoleInput');
+  const command = input.value.trim();
+  if (!command) return;
+  if (!state.gmTargetId && !command.toLowerCase().startsWith('del')) {
+    Toast.error('Chưa chọn nhân vật mục tiêu (bấm "Chọn làm mục tiêu" trong bảng bên dưới)'); return;
+  }
+  const res = await API.post('/admin/game/console', { command, targetCharId: state.gmTargetId });
+  const log = document.getElementById('gmConsoleLog');
+  const line = document.createElement('div');
+  line.style.color = res?.success ? 'var(--accent-green)' : '#FC5C5C';
+  line.textContent = `> ${command}  —  ${res?.message || (res?.success ? 'OK' : 'Lỗi không xác định')}`;
+  log.prepend(line);
+  input.value = '';
+  if (res?.success) loadGmChars();
+}
+
+// ---- Dữ Liệu Game (bảng kiểu MongoDB/MySQL cho toàn bộ id trong game) ----
+async function loadGameDb() {
+  if (!state.gamedbCat) {
+    const res = await API.get('/admin/gamedb/categories');
+    if (!res?.success) return;
+    state.gamedbCats = res.categories;
+    state.gamedbCat = res.categories[0]?.id;
+    document.getElementById('gamedbCatTabs').innerHTML = res.categories.map((c) =>
+      `<div class="admin-tab ${c.id === state.gamedbCat ? 'active' : ''}" onclick="gamedbSwitchCat('${c.id}')">${esc(c.label)} <span style="opacity:.6">(${c.count})</span></div>`).join('');
+  }
+  const res = await API.get(`/admin/gamedb/${state.gamedbCat}`);
+  if (!res?.success) return;
+  const rows = res.rows;
+  if (!rows.length) { document.getElementById('gamedbThead').innerHTML = ''; document.getElementById('gamedbTbody').innerHTML = '<tr><td>Trống</td></tr>'; return; }
+  // Cột hiển thị: id + name (nếu có) + mọi field kiểu number (đây là các chỉ số hay cần chỉnh) + nút Sửa
+  const numericKeys = Object.keys(rows[0]).filter((k) => typeof rows[0][k] === 'number');
+  document.getElementById('gamedbThead').innerHTML = `<th>ID</th><th>Tên</th>${numericKeys.map((k) => `<th>${esc(k)}</th>`).join('')}<th>Hành động</th>`;
+  document.getElementById('gamedbTbody').innerHTML = rows.map((r) => `
+    <tr>
+      <td><code>${esc(r.id)}</code></td>
+      <td>${esc(r.name || r.nameVN || '—')}</td>
+      ${numericKeys.map((k) => `<td>${r[k]}</td>`).join('')}
+      <td><button class="btn btn-sm btn-secondary" onclick='gamedbEdit(${JSON.stringify(r.id)}, ${JSON.stringify(numericKeys)}, ${JSON.stringify(r).replace(/'/g, "&#39;")})'>Sửa</button></td>
+    </tr>`).join('');
+}
+function gamedbSwitchCat(cat) { state.gamedbCat = cat; document.querySelectorAll('#gamedbCatTabs .admin-tab').forEach((t) => t.classList.remove('active')); loadGameDb(); }
+async function gamedbEdit(id, numericKeys, row) {
+  const patch = {};
+  for (const k of numericKeys) {
+    const v = prompt(`${row.name || id} — ${k} (hiện tại: ${row[k]}):`, row[k]);
+    if (v === null) return; // huỷ toàn bộ nếu bấm Cancel ở bất kỳ field nào
+    if (v !== '' && !Number.isNaN(Number(v))) patch[k] = Number(v);
+  }
+  const res = await API.post(`/admin/gamedb/${state.gamedbCat}/${id}`, { patch });
+  if (res?.success) { Toast.success('Đã lưu, có hiệu lực ngay'); loadGameDb(); } else Toast.error(res?.message || 'Lỗi');
+}
+
+// ---- Duyệt sản phẩm Root Shop ----
+async function loadShopMod() {
+  const res = await API.get('/admin/shop/pending');
+  if (!res?.success) return;
+  document.getElementById('shopModTbody').innerHTML = res.products.length ? res.products.map((p) => `
+    <tr>
+      <td><b>${esc(p.name)}</b></td>
+      <td>@${esc(p.sellerId?.username || '?')}</td>
+      <td>${esc(p.category)}</td>
+      <td>${(p.price || 0).toLocaleString()}đ</td>
+      <td>${new Date(p.createdAt).toLocaleDateString('vi-VN')}</td>
+      <td><div class="admin-actions">
+        <button class="btn btn-sm btn-primary" onclick="shopApprove('${p._id}')">Duyệt</button>
+        <button class="btn btn-sm btn-danger" onclick="shopReject('${p._id}')">Từ chối</button>
+      </div></td>
+    </tr>`).join('') : '<tr><td colspan="6"><div class="empty-state">Không có sản phẩm nào đang chờ duyệt</div></td></tr>';
+}
+async function shopApprove(id) {
+  const res = await API.post(`/admin/shop/${id}/approve`, {});
+  if (res?.success) { Toast.success('Đã duyệt sản phẩm'); loadShopMod(); } else Toast.error(res?.message || 'Lỗi');
+}
+async function shopReject(id) {
+  const reason = prompt('Lý do từ chối (người bán sẽ thấy lý do này):', '');
+  if (reason === null) return;
+  const res = await API.post(`/admin/shop/${id}/reject`, { reason });
+  if (res?.success) { Toast.success('Đã từ chối sản phẩm'); loadShopMod(); } else Toast.error(res?.message || 'Lỗi');
+}
+
 async function loadAnnouncements() {
   if (!state.annThreeInited && window.initThreeOrb) {
     window.initThreeOrb(document.getElementById('annComposeThree'), { color: 0x7c5cfc, accent: 0xff5ca8, particles: 50 });
@@ -440,44 +550,6 @@ async function deleteAnnouncement(id) {
   if (!confirm('Xoá thông báo này?')) return;
   const res = await API.delete(`/admin/announcements/${id}`);
   if (res?.success) { Toast.success('Đã xoá'); loadAnnouncements(); } else Toast.error(res?.message || 'Lỗi');
-}
-
-// ===== DUYỆT SHOP =====
-async function refreshShopPendingBadge() {
-  const res = await API.get('/admin/shop/pending');
-  const n = res?.success ? res.products.length : 0;
-  const badge = document.getElementById('shopPendingBadge');
-  badge.style.display = n ? 'inline-flex' : 'none';
-  badge.textContent = n > 99 ? '99+' : n;
-  return res;
-}
-
-async function loadShopPending() {
-  const res = await refreshShopPendingBadge();
-  if (!res?.success) return;
-  document.getElementById('shopPendingTbody').innerHTML = res.products.length ? res.products.map(p => `
-    <tr>
-      <td>${esc(p.name)}</td>
-      <td>${esc(p.seller?.displayName || p.seller?.username || '?')}</td>
-      <td>${esc(p.category)}</td>
-      <td>${formatNum(p.price)}đ</td>
-      <td>${new Date(p.createdAt).toLocaleString('vi-VN')}</td>
-      <td class="admin-actions">
-        <button class="btn btn-primary btn-sm" onclick="approveShopProduct('${p.id}')">Duyệt</button>
-        <button class="btn btn-secondary btn-sm" onclick="rejectShopProduct('${p.id}')">Từ chối</button>
-      </td>
-    </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Không có sản phẩm nào chờ duyệt</td></tr>';
-}
-
-async function approveShopProduct(id) {
-  const res = await API.put(`/admin/shop/${id}/approve`);
-  if (res?.success) { Toast.success(res.message); loadShopPending(); } else Toast.error(res?.message || 'Lỗi');
-}
-
-async function rejectShopProduct(id) {
-  const reason = prompt('Lý do từ chối (tuỳ chọn):') || '';
-  const res = await API.put(`/admin/shop/${id}/reject`, { reason });
-  if (res?.success) { Toast.success(res.message); loadShopPending(); } else Toast.error(res?.message || 'Lỗi');
 }
 
 checkAccessAndInit();

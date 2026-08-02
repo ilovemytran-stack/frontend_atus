@@ -160,24 +160,6 @@ function drawAnimated(sx, sy, category, entityId, wantedClip, holder, dt, opts) 
   return drawPetFrame(sx, sy, `/assets/game/sprites/${category}/${entityId}/${a.clip}/${a.frame}.png`, opts);
 }
 
-// Hiệu ứng "biến hình" khi vừa trang bị ĐỦ 4 món Super Set (equip_motion, 31 frame, xem GD.SUPER_SET).
-// Không đăng ký qua spriteManifest vì đây là 1 sequence DUY NHẤT dùng chung mọi lớp nhân vật, không
-// theo class như combat1/walk/idle — vẽ thẳng qua drawPetFrame với đường dẫn đã biết từ gameData.
-GL.playSuperSetTransform = function () {
-  const superSet = GL.data.superSet;
-  if (!superSet?.equipMotionPath || !GL.player) return;
-  GL.player.superTransformStart = performance.now();
-  GL.player.superTransformUntil = GL.player.superTransformStart + (superSet.equipMotionFrames / GL.SPRITE_FPS) * 1000;
-  GL.toast('Bộ Trang Bị Siêu Cấp đã thức tỉnh — biến hình!', 'gl-toast-levelup', 'sparkles');
-};
-
-function drawSuperSetTransformFrame(sx, sy, dir) {
-  const superSet = GL.data.superSet;
-  const elapsed = performance.now() - (GL.player.superTransformStart || 0);
-  const frame = Math.min(superSet.equipMotionFrames, 1 + Math.floor(elapsed / (1000 / GL.SPRITE_FPS)));
-  return drawPetFrame(sx, sy, `${superSet.equipMotionPath}/${frame}.png`, { dir, heightPx: 112 });
-}
-
 function hashSeed(str) {
   let h = 1779033703;
   for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
@@ -469,6 +451,23 @@ function drawPetMiniMonster(pet, t) {
   drawPetFrame(ox, oy, `/assets/game/pet-skills/skill4/mini_monster/${frame}.png`, { dir: 1, heightPx: 20 });
 }
 
+// Bộ Trang Bị Siêu Cấp: phát trọn 31 frame equip_motion 1 LẦN (không lặp) ngay khi vừa mặc đủ bộ,
+// kèm hào quang toả sáng phía sau cho ấn tượng hơn — xem GL.playSuperSetTransform (game-controls.js).
+function drawSuperSetTransform(sx, sy, fx, dir, t) {
+  const elapsedFrames = Math.floor((performance.now() - fx.startedAt) / 1000 * fx.fps);
+  const frame = Math.min(fx.totalFrames, elapsedFrames + 1);
+  const pulse = 0.7 + Math.sin(t * 14) * 0.3;
+  ctx.save();
+  ctx.globalAlpha = 0.5 * pulse;
+  const glowR = 60 * DPR;
+  const grad = ctx.createRadialGradient(sx, sy - 40 * DPR, 4 * DPR, sx, sy - 40 * DPR, glowR);
+  grad.addColorStop(0, '#5CE8D8'); grad.addColorStop(1, 'rgba(92,232,216,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(sx, sy - 40 * DPR, glowR, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  return drawPetFrame(sx, sy, `/assets/game/super-set/equip_motion/${frame}.png`, { dir, heightPx: 100 });
+}
+
 // Hào Quang (Aura): vòng hào quang xoay quanh nhân vật đang sở hữu — cycle 12 frame liên tục
 function drawAuraGlow(sx, sy, t) {
   const frame = 1 + Math.floor(t * 10) % 12;
@@ -642,6 +641,19 @@ GL.renderFrame = function (t, dt) {
     const { sx, sy } = worldToScreen(fx.x, fx.y);
     drawAnimated(sx, sy, fx.category, fx.defId, 'death', fx, dt, { dir: fx.dir, heightPx: fx.isBoss ? 76 : 54 });
   });
+
+  // Đường bắn của quái đánh xa (caster/archer) — 1 vệt sáng ngắn bay từ quái tới mục tiêu, tự biến mất
+  GL.projectiles = (GL.projectiles || []).filter((pr) => performance.now() - pr.spawnedAt < pr.duration);
+  GL.projectiles.forEach((pr) => {
+    const prog = Math.min(1, (performance.now() - pr.spawnedAt) / pr.duration);
+    const a1 = worldToScreen(pr.x1, pr.y1), a2 = worldToScreen(pr.x2, pr.y2);
+    const hx = a1.sx + (a2.sx - a1.sx) * prog, hy = a1.sy + (a2.sy - a1.sy) * prog;
+    ctx.save();
+    ctx.strokeStyle = pr.color; ctx.lineWidth = 3 * DPR; ctx.globalAlpha = 1 - prog * 0.3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(a1.sx, a1.sy); ctx.lineTo(hx, hy); ctx.stroke();
+    ctx.beginPath(); ctx.arc(hx, hy, 4 * DPR, 0, Math.PI * 2); ctx.fillStyle = pr.color; ctx.fill();
+    ctx.restore();
+  });
   (GL.summons || []).forEach((s) => drawSummon(s, t, dt));
   (GL.pets || []).forEach((pet) => drawPet(pet, t));
   (GL.petMiniMonsters || []).forEach((pet) => drawPetMiniMonster(pet, t));
@@ -651,11 +663,23 @@ GL.renderFrame = function (t, dt) {
   const syDraw = sy - zOff;
   const cls = GL.classById(GL.char.classId);
   if (GL.char.stats?.hasAura) drawAuraGlow(sx, syDraw, t);
-  const inSuperTransform = performance.now() < (p.superTransformUntil || 0);
-  let gotSprite = inSuperTransform && drawSuperSetTransformFrame(sx, syDraw, p.dir);
-  if (!inSuperTransform) {
-    const wantedClip = performance.now() < (p.actionUntil || 0) ? p.actionClip : (p.moving ? 'walk' : 'idle');
-    gotSprite = drawAnimated(sx, syDraw, 'characters', cls.id, wantedClip, p, dt, { dir: p.dir, heightPx: 80 });
+  let gotSprite;
+  const transformActive = p.transformFx && (performance.now() - p.transformFx.startedAt) < (p.transformFx.totalFrames / p.transformFx.fps) * 1000;
+  if (transformActive) {
+    gotSprite = drawSuperSetTransform(sx, syDraw, p.transformFx, p.dir, t);
+  } else {
+    if (p.transformFx) p.transformFx = null; // vừa chạy xong, dọn cờ để quay lại animation bình thường
+    if (GL.char.stats?.hasFullSuperSet) {
+      // "Biến thành người khác" khi mặc đủ bộ — GIỮ NGUYÊN hình dạng đã biến (không chỉ chớp 1 lần rồi
+      // quay lại như cũ) suốt thời gian còn mặc đủ bộ. Bộ ảnh nguồn chỉ có 2 dáng tĩnh (không phải full
+      // animation nhiều frame như nhân vật gốc) nên đổi qua lại 2 dáng đó theo nhịp để đỡ "đứng hình".
+      const showcaseFrame = Math.floor(t * 0.5) % 2 === 0 ? 'showcase_1' : 'showcase_2';
+      gotSprite = drawPetFrame(sx, syDraw, `/assets/game/super-set/equipment_set/${showcaseFrame}.png`, { dir: p.dir, heightPx: 84 });
+    }
+    if (!gotSprite) {
+      const wantedClip = performance.now() < (p.actionUntil || 0) ? p.actionClip : (p.moving ? 'walk' : 'idle');
+      gotSprite = drawAnimated(sx, syDraw, 'characters', cls.id, wantedClip, p, dt, { dir: p.dir, heightPx: 80 });
+    }
     if (!gotSprite) gotSprite = drawSprite(sx, syDraw, cls.portrait, { dir: p.dir, moving: p.moving, t, heightPx: 80 });
     if (!gotSprite) drawHumanoid(sx, syDraw, { color: cls.color, dir: p.dir, moving: p.moving, t, attacking: p.attackFx > 0, weaponType: cls.weaponType });
   }
