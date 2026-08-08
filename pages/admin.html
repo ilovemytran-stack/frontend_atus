@@ -43,6 +43,14 @@
 .role-pill.user { background: var(--bg-elevated); color: var(--text-muted); }
 .ban-pill { padding: 2px 9px; border-radius: var(--radius-full); font-size: 0.72rem; font-weight: 700; background: rgba(252,92,92,0.15); color: #FC5C5C; }
 .empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+.gm-modal-overlay { position: fixed; inset: 0; background: rgba(4,6,10,0.7); backdrop-filter: blur(3px); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.gm-modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; width: 100%; max-width: 420px; max-height: 80vh; display: flex; flex-direction: column; }
+.gm-modal-head { font-weight: 700; margin-bottom: 12px; }
+.gm-modal-body { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 4px; }
+.gm-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.82rem; }
+.gm-field span { color: var(--text-muted); flex: 0 0 auto; }
+.gm-field input { flex: 1; max-width: 140px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; color: var(--text-primary); text-align: right; }
+.gm-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 </style>
 </head>
 <body>
@@ -133,11 +141,20 @@
   <div id="panel-gamedb" class="admin-panel" style="display:none">
     <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Toàn bộ id vũ khí/giáp/vật phẩm/quái/boss/pet/thú triệu hồi trong G.Legendary — sửa xong có hiệu lực ngay, không cần khởi động lại server.</div>
     <div class="admin-tabs" id="gamedbCatTabs" style="border-bottom:none;margin-bottom:10px"></div>
+    <input type="text" class="input" id="gamedbSearch" placeholder="Tìm theo id hoặc tên..." style="margin-bottom:10px;max-width:320px" oninput="gamedbRenderTable()">
     <div class="admin-table-wrap"><table class="admin-table"><thead><tr id="gamedbThead"></tr></thead><tbody id="gamedbTbody"></tbody></table></div>
   </div>
 
   <div id="panel-shopmod" class="admin-panel" style="display:none">
-    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:12px">Sản phẩm người bán vừa đăng — cần duyệt mới hiển thị công khai trên Root Shop.</div>
+    <div style="color:var(--text-muted);font-size:0.82rem;margin-bottom:8px">Đăng ký người bán cần duyệt trước — sau đó sản phẩm họ đăng cũng cần duyệt riêng từng món.</div>
+    <b style="color:var(--text-primary)">Đăng ký người bán chờ duyệt</b>
+    <div class="admin-table-wrap" style="margin-bottom:20px">
+      <table class="admin-table">
+        <thead><tr><th>Tài khoản</th><th>CMND/CCCD</th><th>SĐT</th><th>Ngày đăng ký</th><th>Hành động</th></tr></thead>
+        <tbody id="shopSellerTbody"></tbody>
+      </table>
+    </div>
+    <b style="color:var(--text-primary)">Sản phẩm chờ duyệt</b>
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead><tr><th>Sản phẩm</th><th>Người bán</th><th>Danh mục</th><th>Giá</th><th>Ngày đăng</th><th>Hành động</th></tr></thead>
@@ -464,33 +481,77 @@ async function loadGameDb() {
   }
   const res = await API.get(`/admin/gamedb/${state.gamedbCat}`);
   if (!res?.success) return;
-  const rows = res.rows;
-  if (!rows.length) { document.getElementById('gamedbThead').innerHTML = ''; document.getElementById('gamedbTbody').innerHTML = '<tr><td>Trống</td></tr>'; return; }
-  // Cột hiển thị: id + name (nếu có) + mọi field kiểu number (đây là các chỉ số hay cần chỉnh) + nút Sửa
-  const numericKeys = Object.keys(rows[0]).filter((k) => typeof rows[0][k] === 'number');
-  document.getElementById('gamedbThead').innerHTML = `<th>ID</th><th>Tên</th>${numericKeys.map((k) => `<th>${esc(k)}</th>`).join('')}<th>Hành động</th>`;
+  state.gamedbRows = res.rows;
+  gamedbRenderTable();
+}
+function gamedbRenderTable() {
+  const rows = (state.gamedbRows || []).filter((r) => {
+    const q = (document.getElementById('gamedbSearch')?.value || '').toLowerCase().trim();
+    if (!q) return true;
+    return String(r.id).toLowerCase().includes(q) || String(r.name || r.nameVN || '').toLowerCase().includes(q);
+  });
+  if (!state.gamedbRows?.length) { document.getElementById('gamedbThead').innerHTML = ''; document.getElementById('gamedbTbody').innerHTML = '<tr><td>Trống</td></tr>'; return; }
+  // Hiện TẤT CẢ field kiểu number/string/boolean ở mức gốc (giống bảng MySQL — thấy hết cột, không chỉ số) — field lồng object/mảng gộp lại 1 cột "..." cho gọn, không hiện chi tiết ở bảng chính.
+  const allKeys = Object.keys(state.gamedbRows[0]).filter((k) => k !== 'id');
+  const flatKeys = allKeys.filter((k) => ['number', 'string', 'boolean'].includes(typeof state.gamedbRows[0][k]));
+  const numericKeys = flatKeys.filter((k) => typeof state.gamedbRows[0][k] === 'number');
+  document.getElementById('gamedbThead').innerHTML = `<th>id</th>${flatKeys.map((k) => `<th>${esc(k)}</th>`).join('')}<th>Hành động</th>`;
   document.getElementById('gamedbTbody').innerHTML = rows.map((r) => `
     <tr>
       <td><code>${esc(r.id)}</code></td>
-      <td>${esc(r.name || r.nameVN || '—')}</td>
-      ${numericKeys.map((k) => `<td>${r[k]}</td>`).join('')}
-      <td><button class="btn btn-sm btn-secondary" onclick='gamedbEdit(${JSON.stringify(r.id)}, ${JSON.stringify(numericKeys)}, ${JSON.stringify(r).replace(/'/g, "&#39;")})'>Sửa</button></td>
-    </tr>`).join('');
+      ${flatKeys.map((k) => `<td>${typeof r[k] === 'boolean' ? (r[k] ? '✓' : '—') : esc(String(r[k] ?? ''))}</td>`).join('')}
+      <td><button class="btn btn-sm btn-secondary" onclick='gamedbOpenEdit(${JSON.stringify(r.id)}, ${JSON.stringify(numericKeys)})'>Sửa</button></td>
+    </tr>`).join('') || `<tr><td colspan="${flatKeys.length + 2}"><div class="empty-state">Không khớp tìm kiếm "${esc(document.getElementById('gamedbSearch')?.value || '')}"</div></td></tr>`;
 }
-function gamedbSwitchCat(cat) { state.gamedbCat = cat; document.querySelectorAll('#gamedbCatTabs .admin-tab').forEach((t) => t.classList.remove('active')); loadGameDb(); }
-async function gamedbEdit(id, numericKeys, row) {
-  const patch = {};
-  for (const k of numericKeys) {
-    const v = prompt(`${row.name || id} — ${k} (hiện tại: ${row[k]}):`, row[k]);
-    if (v === null) return; // huỷ toàn bộ nếu bấm Cancel ở bất kỳ field nào
-    if (v !== '' && !Number.isNaN(Number(v))) patch[k] = Number(v);
-  }
-  const res = await API.post(`/admin/gamedb/${state.gamedbCat}/${id}`, { patch });
-  if (res?.success) { Toast.success('Đã lưu, có hiệu lực ngay'); loadGameDb(); } else Toast.error(res?.message || 'Lỗi');
+function gamedbSwitchCat(cat) { state.gamedbCat = cat; state.gamedbRows = null; document.getElementById('gamedbSearch').value = ''; document.querySelectorAll('#gamedbCatTabs .admin-tab').forEach((t) => t.classList.remove('active')); loadGameDb(); }
+
+// Modal sửa 1 dòng — hiện SẴN toàn bộ field số cùng lúc (giống phpMyAdmin) thay vì hỏi từng ô 1 qua prompt().
+function gamedbOpenEdit(id, numericKeys) {
+  const row = (state.gamedbRows || []).find((r) => r.id === id);
+  if (!row) return;
+  const modal = document.createElement('div');
+  modal.className = 'gm-modal-overlay';
+  modal.innerHTML = `
+    <div class="gm-modal">
+      <div class="gm-modal-head">Sửa: ${esc(row.name || row.nameVN || id)} <code style="font-weight:400;font-size:.7em;opacity:.7">${esc(id)}</code></div>
+      <div class="gm-modal-body">
+        ${numericKeys.map((k) => `<label class="gm-field"><span>${esc(k)}</span><input type="number" step="any" id="gmf_${esc(k)}" value="${row[k]}"></label>`).join('')}
+      </div>
+      <div class="gm-modal-actions">
+        <button class="btn btn-sm btn-secondary" id="gmModalCancel">Huỷ</button>
+        <button class="btn btn-sm btn-primary" id="gmModalSave">Lưu</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  modal.querySelector('#gmModalCancel').onclick = () => modal.remove();
+  modal.querySelector('#gmModalSave').onclick = async () => {
+    const patch = {};
+    numericKeys.forEach((k) => {
+      const v = modal.querySelector(`#gmf_${k}`).value;
+      if (v !== '' && !Number.isNaN(Number(v))) patch[k] = Number(v);
+    });
+    const res = await API.post(`/admin/gamedb/${state.gamedbCat}/${id}`, { patch });
+    if (res?.success) { Toast.success('Đã lưu, có hiệu lực ngay'); modal.remove(); loadGameDb(); } else Toast.error(res?.message || 'Lỗi');
+  };
 }
 
-// ---- Duyệt sản phẩm Root Shop ----
+// ---- Duyệt người bán + sản phẩm Root Shop ----
 async function loadShopMod() {
+  const sellerRes = await API.get('/admin/shop/sellers/pending');
+  if (sellerRes?.success) {
+    document.getElementById('shopSellerTbody').innerHTML = sellerRes.sellers.length ? sellerRes.sellers.map((u) => `
+      <tr>
+        <td><b>@${esc(u.username)}</b></td>
+        <td>${esc(u.seller?.idCardNumber || '')}</td>
+        <td>${esc(u.seller?.phone || '')}</td>
+        <td>${u.seller?.registeredAt ? new Date(u.seller.registeredAt).toLocaleDateString('vi-VN') : ''}</td>
+        <td><div class="admin-actions">
+          <button class="btn btn-sm btn-primary" onclick="sellerApprove('${u._id}')">Duyệt</button>
+          <button class="btn btn-sm btn-danger" onclick="sellerReject('${u._id}')">Từ chối</button>
+        </div></td>
+      </tr>`).join('') : '<tr><td colspan="5"><div class="empty-state">Không có đăng ký nào đang chờ</div></td></tr>';
+  }
   const res = await API.get('/admin/shop/pending');
   if (!res?.success) return;
   document.getElementById('shopModTbody').innerHTML = res.products.length ? res.products.map((p) => `
@@ -505,6 +566,16 @@ async function loadShopMod() {
         <button class="btn btn-sm btn-danger" onclick="shopReject('${p._id}')">Từ chối</button>
       </div></td>
     </tr>`).join('') : '<tr><td colspan="6"><div class="empty-state">Không có sản phẩm nào đang chờ duyệt</div></td></tr>';
+}
+async function sellerApprove(userId) {
+  const res = await API.post(`/admin/shop/sellers/${userId}/approve`, {});
+  if (res?.success) { Toast.success('Đã duyệt người bán'); loadShopMod(); } else Toast.error(res?.message || 'Lỗi');
+}
+async function sellerReject(userId) {
+  const reason = prompt('Lý do từ chối:', '');
+  if (reason === null) return;
+  const res = await API.post(`/admin/shop/sellers/${userId}/reject`, { reason });
+  if (res?.success) { Toast.success('Đã từ chối'); loadShopMod(); } else Toast.error(res?.message || 'Lỗi');
 }
 async function shopApprove(id) {
   const res = await API.post(`/admin/shop/${id}/approve`, {});

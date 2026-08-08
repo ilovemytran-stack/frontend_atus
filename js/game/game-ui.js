@@ -179,9 +179,21 @@ function renderEquipTab() {
   return html;
 }
 
+const RARITY_SORT_RANK = { super: 0, special: 1, legendary: 2, epic: 3, rare: 4, uncommon: 5, common: 6, starter: 7 };
 function renderBagTab() {
   const owned = GL.char.inventory.filter((i) => !(i.kind === 'weapon' && i.itemId === GL.char.equipment.weapon) && !(i.kind === 'armor' && Object.values(GL.char.equipment).includes(i.itemId)));
   if (!owned.length) return '<div style="color:var(--gl-text-dim);text-align:center;padding:20px 0">Túi đồ trống. Hãy mua thêm từ NPC trong thành!</div>';
+  // Tự động sắp xếp: vũ khí → giáp → vật phẩm tiêu hao, trong từng nhóm ưu tiên phẩm chất cao trước,
+  // cuối cùng theo tên A-Z — luôn sắp xếp lại mỗi lần mở túi đồ, không cần bấm nút nào cả.
+  const kindRank = { weapon: 0, armor: 1, consumable: 2 };
+  owned.sort((a, b) => {
+    if (kindRank[a.kind] !== kindRank[b.kind]) return kindRank[a.kind] - kindRank[b.kind];
+    const table = (k) => (k === 'weapon' ? GL.data.weapons : k === 'armor' ? GL.data.armor : GL.data.consumables);
+    const defA = table(a.kind)[a.itemId], defB = table(b.kind)[b.itemId];
+    const rA = RARITY_SORT_RANK[defA?.rarity] ?? 9, rB = RARITY_SORT_RANK[defB?.rarity] ?? 9;
+    if (rA !== rB) return rA - rB;
+    return (defA?.name || a.itemId).localeCompare(defB?.name || b.itemId, 'vi');
+  });
   const hasChest = owned.some((i) => i.itemId === 'treasure_chest');
   const ownedKeys = owned.filter((i) => i.itemId.startsWith('key_'));
   let html = '';
@@ -561,13 +573,18 @@ function renderPetPanel() {
 function renderNotifPanel() {
   const mails = (GL.char.mailbox || []).filter((m) => !m.claimed);
   const duels = (GL.char.godDuels || []).filter((d) => d.status === 'pending');
+  // BUG CŨ: biến "claimable" được dùng ở dưới nhưng CHƯA TỪNG được khai báo ở đâu cả — mỗi lần mở bảng
+  // Thông Báo là văng lỗi "claimable is not defined" ngay lập tức, khiến CẢ bảng không hiện được gì
+  // (đây chính là lý do "phần thông báo trong game không hoạt động"). Giờ tính đúng: nhiệm vụ đã đủ
+  // tiến trình (progress >= target) nhưng CHƯA bấm nhận thưởng (claimed=false).
+  const claimable = (GL.char.quests || []).filter((q) => q.progress >= q.target && !q.claimed);
   let html = '';
-  if (GL.lastBossStatus?.active) {
-    html += `<div style="padding:10px 12px;margin-bottom:10px;border:1px solid rgba(232,92,76,.4);border-radius:10px;background:rgba(232,92,76,.08)">
-      ${GL.icon('crown')} <b>Chaoseraph</b> đang ở <b>${GL.lastBossStatus.continentName} · ${GL.lastBossStatus.mapName}</b> (khu ${GL.lastBossStatus.zone})<br>
-      <span style="color:var(--gl-text-dim);font-size:.65rem">Dạng ${GL.lastBossStatus.form}/5 · ${Math.round(GL.lastBossStatus.hp)}/${GL.lastBossStatus.maxHp} HP</span><br>
-      <button class="gl-btn-sm" id="glTeleportBoss" style="margin-top:6px">${GL.icon('portal')} Dịch chuyển đến Boss</button>
-    </div>`;
+  if (GL.lastBossStatus?.active && GL.lastBossStatus.bosses?.length) {
+    html += GL.lastBossStatus.bosses.map((b) => `<div style="padding:10px 12px;margin-bottom:8px;border:1px solid rgba(232,92,76,.4);border-radius:10px;background:rgba(232,92,76,.08)">
+      ${GL.icon('crown')} <b>Chaoseraph</b> đang ở <b>${b.continentName} · ${b.mapName}</b> (khu ${b.zone})<br>
+      <span style="color:var(--gl-text-dim);font-size:.65rem">Dạng ${b.form}/5 · ${Math.round(b.hp)}/${b.maxHp} HP</span><br>
+      <button class="gl-btn-sm" data-teleport-boss="${b.mapId}:${b.zone}" style="margin-top:6px">${GL.icon('portal')} Dịch chuyển đến Boss</button>
+    </div>`).join('');
   }
   if (duels.length) {
     html += `<div style="color:var(--gl-gold);font-size:.7rem;font-weight:700;margin-bottom:6px">${GL.icon('sword')} THÁCH ĐẤU THẦN LINH</div>`;
@@ -603,13 +620,15 @@ function renderNotifPanel() {
     }
     const duelBtn = e.target.closest('[data-duel]');
     if (duelBtn) { GL.startGodDuel(Number(duelBtn.dataset.duel)); return; }
-    const teleBtn = e.target.closest('#glTeleportBoss');
-    if (teleBtn && GL.lastBossStatus?.active) {
-      const map = GL.mapById(GL.lastBossStatus.mapId);
+    const teleBtn = e.target.closest('[data-teleport-boss]');
+    if (teleBtn) {
+      const [mapId, zoneStr] = teleBtn.dataset.teleportBoss.split(':');
+      const zone = Number(zoneStr);
+      const map = GL.mapById(mapId);
       if (!map) { Toast.error('Không tìm thấy bản đồ của Boss'); return; }
       await API.post('/game/character/move', { mapId: map.id, x: GL.BOSS_SPOT?.x ?? 500, y: GL.BOSS_SPOT?.y ?? 300, freeTeleport: true });
       GL.player.x = GL.BOSS_SPOT?.x ?? 500; GL.player.y = GL.BOSS_SPOT?.y ?? 300;
-      GL.joinMap(map, GL.lastBossStatus.zone);
+      GL.joinMap(map, zone);
       closePanel('glPanelNotif');
       Toast.success('Đã dịch chuyển đến chỗ Chaoseraph!');
     }

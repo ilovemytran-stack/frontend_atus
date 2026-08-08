@@ -152,12 +152,31 @@ function stepAnim(holder, manifest, wantedClip, dt) {
 
 // Vẽ entity bằng animation thật nếu có manifest cho entityId này; trả về false nếu KHÔNG có để nơi gọi
 // tự fallback (ảnh tĩnh cũ / hình vector) — không phá vỡ các entity chưa có sprite (an toàn khi thiếu asset).
+//
+// SỬA LỖI GIẬT HÌNH: mỗi frame animation là 1 file ảnh RIÊNG, tải bất đồng bộ qua mạng — nếu vòng lặp
+// vừa đổi sang frame kế tiếp mà ảnh CHƯA TẢI XONG, trước đây hàm này trả về false ngay lập tức, khiến
+// nơi gọi rơi xuống tầng fallback (ảnh tĩnh cũ 512x512 hoặc hình vector) chỉ trong đúng 1-2 frame đó rồi
+// lại quay về animation khi ảnh tải xong — tạo cảm giác nhân vật/quái "chớp nháy" đổi hẳn phong cách
+// liên tục, nhất là lúc mới vào map (nhiều entity cùng lúc tải hàng loạt frame mới). Giờ giữ lại frame
+// GẦN NHẤT đã tải xong thành công của CHÍNH bộ animation đó để vẽ tạm (mượt hơn nhiều, gần như không
+// nhận ra được so với chờ), CHỈ rơi xuống fallback nếu chưa có frame nào của entity này từng tải xong.
 function drawAnimated(sx, sy, category, entityId, wantedClip, holder, dt, opts) {
   if (!entityId) return false;
   const manifest = spriteManifestFor(category, entityId);
   if (!manifest) return false;
   const a = stepAnim(holder, manifest, wantedClip, dt);
-  return drawPetFrame(sx, sy, `/assets/game/sprites/${category}/${entityId}/${a.clip}/${a.frame}.png`, opts);
+  const base = `/assets/game/sprites/${category}/${entityId}/${a.clip}`;
+  const url = `${base}/${a.frame}.png`;
+  const img = getPortraitImg(url); // bắt đầu tải (hoặc lấy cache) ngay, dù có thể vẽ tạm bằng lastGoodUrl bên dưới
+  // Tải trước frame kế tiếp trong CÙNG clip khi rảnh — giảm khả năng rơi vào tình huống "chưa tải xong" ở lượt sau
+  const total = manifest[a.clip] || 1;
+  if (total > 1) getPortraitImg(`${base}/${(a.frame % total) + 1}.png`);
+  if (img && img.complete && img.naturalWidth) {
+    holder.lastGoodUrl = url;
+    return drawPetFrame(sx, sy, url, opts);
+  }
+  if (holder.lastGoodUrl) return drawPetFrame(sx, sy, holder.lastGoodUrl, opts);
+  return false; // chưa từng có frame nào của entity này tải xong -> để nơi gọi fallback ảnh tĩnh/vector
 }
 
 function hashSeed(str) {

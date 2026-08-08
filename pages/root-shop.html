@@ -1307,10 +1307,12 @@ function WithdrawPanel({ user, error, onWithdraw, onNeedSellerRegistration }) {
             " GỬI_YÊU_CẦU_RÚT")));
 }
 /* ------------------------- xác minh người bán ------------------------- */
-function SellerRegistrationModal({ user, onClose, onSubmit }) {
+function SellerRegistrationModal({ user, serverError, onClose, onSubmit }) {
     const [idCardNumber, setIdCardNumber] = useState('');
     const [phone, setPhone] = useState((user && user.phone) || '');
     const [error, setError] = useState('');
+    const isPending = user?.seller?.status === 'pending';
+    const wasRejected = user?.seller?.status === 'rejected';
     function handleSubmit() {
         const idDigits = idCardNumber.replace(/\D/g, '');
         const phoneDigits = normalizePhone(phone);
@@ -1324,6 +1326,15 @@ function SellerRegistrationModal({ user, onClose, onSubmit }) {
         }
         setError('');
         onSubmit({ idCardNumber: idDigits, phone: phoneDigits });
+    }
+    if (isPending) {
+        return (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
+            React.createElement("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none" },
+                React.createElement("div", { className: "rounded-md p-5 text-center pointer-events-auto", style: { background: COLORS.surface, border: `1px solid ${COLORS.border}`, maxWidth: 320 } },
+                    React.createElement("p", { className: "text-sm font-bold mb-2" }, "Đơn đăng ký đang chờ duyệt"),
+                    React.createElement("p", { className: "text-xs mb-3", style: { color: COLORS.mutedLight } }, "Admin sẽ xem xét CCCD/CMND và số điện thoại bạn đã gửi. Quay lại sau nhé."),
+                    React.createElement("button", { onClick: onClose, className: "px-4 py-2 rounded-md text-xs font-bold", style: { background: COLORS.border } }, "Đóng")))));
     }
     return (React.createElement(React.Fragment, null,
         React.createElement("div", { className: "fixed inset-0 z-40", style: { background: 'rgba(4,6,5,0.75)', backdropFilter: 'blur(3px)' }, onClick: onClose }),
@@ -1341,7 +1352,8 @@ function SellerRegistrationModal({ user, onClose, onSubmit }) {
                     React.createElement("div", { className: "mb-4" },
                         React.createElement("label", { style: labelStyle, className: "block mb-1" }, "Số điện thoại liên hệ *"),
                         React.createElement("input", { value: phone, onChange: (e) => setPhone(e.target.value), placeholder: "0912 345 678", className: "search-input no-spinner", style: inputStyle })),
-                    error && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error),
+                    wasRejected && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.amber } }, `Đơn trước đã bị từ chối${user?.seller?.rejectReason ? ': ' + user.seller.rejectReason : ''}. Bạn có thể gửi lại.`),
+                    (error || serverError) && React.createElement("p", { className: "mb-3", style: { fontSize: '11px', color: COLORS.danger } }, error || serverError),
                     React.createElement("button", { onClick: handleSubmit, className: "w-full py-2.5 rounded-md font-bold text-sm transition-all duration-200 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2", style: { background: COLORS.amber, color: '#1a1200' } },
                         React.createElement(ShieldCheck, { size: 15 }),
                         " XÁC_NHẬN_ĐĂNG_KÝ"))))));
@@ -1526,6 +1538,7 @@ export default function RootShop() {
     const [walletError, setWalletError] = useState('');
     const [withdrawError, setWithdrawError] = useState('');
     const [showSellerRegistration, setShowSellerRegistration] = useState(false);
+    const [sellerRegError, setSellerRegError] = useState('');
     const [sellerRegIntent, setSellerRegIntent] = useState('sell'); // 'sell' | 'withdraw' — decides what happens right after registering
     const [showTransactionHistory, setShowTransactionHistory] = useState(false);
     const [showWithdrawalAdmin, setShowWithdrawalAdmin] = useState(false);
@@ -1876,20 +1889,42 @@ export default function RootShop() {
             [phone]: (prev[phone] || []).map((t) => (t.id === txId ? { ...t, status: outcome === 'approve' ? 'completed' : 'rejected' } : t)),
         }));
     }
-    function submitSellerRegistration({ idCardNumber, phone }) {
+    async function submitSellerRegistration({ idCardNumber, phone }) {
         if (!currentUser)
             return;
-        updateUserRecord(currentUser.phone, (u) => ({ ...u, seller: { idCardNumber, phone, registeredAt: new Date().toISOString() } }));
-        setShowSellerRegistration(false);
-        if (sellerRegIntent === 'sell')
-            setShowAddProduct(true);
+        // TRƯỚC ĐÂY: chỉ setState ở client (updateUserRecord) — admin không hề thấy đơn đăng ký này,
+        // không có nơi nào để duyệt. GIỜ: gửi thật lên server (routes/shopProducts.js /seller/register),
+        // admin duyệt trong admin.html tab "Duyệt Sản Phẩm". Vẫn cập nhật state cục bộ để UI phản hồi
+        // ngay (hiện "đang chờ duyệt"), nhưng trạng thái THẬT nằm ở server từ giờ.
+        try {
+            const res = await fetch(API_URL + '/shop/seller/register', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+                body: JSON.stringify({ idCardNumber, phone }),
+            }).then((r) => r.json());
+            if (!res.success) { setSellerRegError(res.message || 'Không gửi được đăng ký'); return; }
+            updateUserRecord(currentUser.phone, (u) => ({ ...u, seller: res.seller }));
+            setShowSellerRegistration(false);
+            setSellerRegError('');
+        } catch (e) {
+            setSellerRegError('Lỗi kết nối, thử lại sau');
+        }
     }
     function handleOpenAddProduct() {
         if (!currentUser) {
             goToLogin();
             return;
         }
-        if (!currentUser.seller) {
+        if (currentUser.seller?.status === 'pending') {
+            setSellerRegError('Đơn đăng ký người bán của bạn đang chờ admin duyệt.');
+            return;
+        }
+        if (currentUser.seller?.status === 'rejected') {
+            setSellerRegIntent('sell');
+            setShowSellerRegistration(true); // cho đăng ký lại sau khi bị từ chối
+            return;
+        }
+        if (currentUser.seller?.status !== 'approved') {
             setSellerRegIntent('sell');
             setShowSellerRegistration(true);
             return;
@@ -2320,7 +2355,7 @@ export default function RootShop() {
         React.createElement(CartDrawer, { open: cartOpen, onClose: () => setCartOpen(false), items: cartItems, onSetQty: setCartQty, onRemove: removeItem, total: cartTotal, onOpenCheckout: () => { setCartOpen(false); setCheckoutOpen(true); } }),
         checkoutOpen && (React.createElement(CheckoutModal, { items: cartItems, total: cartTotal, status: checkoutStatus, orderNumber: orderNumber, orderInfo: orderInfo, bankSettings: bankSettings, onConfirm: handleCheckout, onCancelOrder: cancelPendingOrder, onConfirmPayment: confirmOrderPayment, onClose: closeCheckout })),
         showWallet && currentUser && (React.createElement(WalletModal, { user: currentUser, bankSettings: bankSettings, topup: topup, busy: false, error: walletError, withdrawError: withdrawError, onStartTopup: startTopup, onCancelTopup: cancelTopup, onConfirmTopup: confirmTopup, onWithdraw: handleWithdraw, onOpenHistory: () => setShowTransactionHistory(true), onOpenDigitalOrders: () => setShowDigitalOrders(true), digitalOrdersBadge: actionableDigitalOrders, onNeedSellerRegistration: () => { setSellerRegIntent('withdraw'); setShowSellerRegistration(true); }, onClose: () => { setShowWallet(false); setTopup(null); }, onLogout: handleLogout })),
-        showSellerRegistration && currentUser && (React.createElement(SellerRegistrationModal, { user: currentUser, onClose: () => setShowSellerRegistration(false), onSubmit: submitSellerRegistration })),
+        showSellerRegistration && currentUser && (React.createElement(SellerRegistrationModal, { user: currentUser, serverError: sellerRegError, onClose: () => { setShowSellerRegistration(false); setSellerRegError(''); }, onSubmit: submitSellerRegistration })),
         showTransactionHistory && currentUser && (React.createElement(TransactionHistoryModal, { transactions: transactions[currentUser.phone] || [], onClose: () => setShowTransactionHistory(false) })),
         showWithdrawalAdmin && (React.createElement(WithdrawalAdminModal, { requests: pendingWithdrawals, onApprove: (phone, txId) => resolveWithdrawal(phone, txId, 'approve'), onReject: (phone, txId) => resolveWithdrawal(phone, txId, 'reject'), onClose: () => setShowWithdrawalAdmin(false) })),
         showDigitalOrders && (React.createElement(DigitalOrdersModal, { currentUserPhone: currentUser?.phone || null, manageMode: manageMode, orders: digitalOrders, onConfirmReceipt: confirmDigitalOrderReceipt, onDispute: disputeDigitalOrder, onResolveDispute: resolveDigitalDispute, onClose: () => setShowDigitalOrders(false) })),

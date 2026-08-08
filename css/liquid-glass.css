@@ -17,25 +17,18 @@
 }
 
 /* ---------- Sidebar nổi ---------- */
-.glass-sidebar.sidebar {
-  top: 0; left: 0; height: 100dvh; border-radius: 0;
-  transition: transform var(--spring);
-  background: var(--bg-card); border-right: 1px solid var(--border);
-}
-.glass-sidebar.sidebar.open {
-  top: 12px; left: 12px; height: calc(100dvh - 24px);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border); box-shadow: var(--shadow-md);
-}
-.main-content.has-glass-sidebar { margin-left: 0; }
-
+/* QUAN TRỌNG: KHÔNG đụng tới position/top/left/transform/width/height/z-index ở đây — toàn bộ phần
+   hiện/ẩn (mobile: transform translateX + class .open, desktop: transform:none) đã được .sidebar và
+   .sidebar.open trong global.css xử lý đúng rồi. Bản trước đây từng tự set lại top/left/height/
+   border-radius riêng cho .glass-sidebar, vô tình tạo xung đột khiến sidebar Atelier lệch layout —
+   giờ file này CHỈ đổi màu sắc (nền/viền/bóng đổ), không đổi bố cục/vị trí.
+   Ảnh hưởng CHỈ nền/viền — Atelier vì không có .theme-light nên vẫn nhận màu tối gốc y hệt trước đây,
+   thực chất không đổi gì so với lúc chưa redesign, chỉ CÓ SẴN class glass-sidebar (do layout.js gắn
+   sẵn cho mọi trang) để phòng khi trang nào cần custom thêm. */
+.glass-sidebar.sidebar { background: var(--bg-card); border-right: 1px solid var(--border); }
+.glass-sidebar.sidebar.open { box-shadow: var(--shadow-md); }
 @media (min-width: 769px) {
-  .glass-sidebar.sidebar {
-    top: 12px; left: 12px; height: calc(100dvh - 24px);
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--border); box-shadow: var(--shadow-sm);
-  }
-  .main-content.has-glass-sidebar { margin-left: calc(var(--sidebar-w) + 24px); }
+  .glass-sidebar.sidebar { border-right: 1px solid var(--border); box-shadow: var(--shadow-sm); }
 }
 
 /* ---------- Top bar nổi (desktop) — chứa ô tìm kiếm ---------- */
