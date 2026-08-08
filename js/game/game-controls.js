@@ -294,7 +294,7 @@ GL.tryAttack = function () {
   }
   const target = GL.nearestMonster(80);
   if (target) {
-    const dmgInfo = GL.rollDamage(atkWithBuffs, target.def, stats.crit);
+    const dmgInfo = GL.rollDamage(atkWithBuffs, target.armor, stats.crit);
     GL.applyMonsterHit(target, dmgInfo);
     GL.applyAuraOnHit(dmgInfo.dmg);
   }
@@ -334,7 +334,7 @@ GL.trySkill = function (slot) {
     } else {
       const targets = isAoe ? GL.monsters.filter((m) => m.alive && GL.dist(m, GL.player) < 110) : [GL.nearestMonster(110)].filter(Boolean);
       targets.forEach((m) => {
-        const dmgInfo = GL.rollDamage(stats.atk * atkMult, m.def, stats.crit + 10);
+        const dmgInfo = GL.rollDamage(stats.atk * atkMult, m.armor, stats.crit + 10);
         GL.applyMonsterHit(m, dmgInfo);
         GL.applyAuraOnHit(dmgInfo.dmg);
       });

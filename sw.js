@@ -1,5 +1,5 @@
-const CACHE = 'socialshop-v5'; // v5: bump để buộc mọi máy đang giữ global.css/feed.css/api.js/layout.js
-// cũ (từ trước khi sửa layout mobile-first) phải bỏ cache đó và lấy lại bản mới.
+const CACHE = 'socialshop-v6'; // v6 (2026-08-08): bump vì đã sửa lỗi "undefined" tên quái/summon (def/armor)
+// + đổi query ?v= của mọi trang — máy nào đang giữ cache CŨ phải bỏ hết, lấy lại bản mới hoàn toàn.
 const STATIC = ['/css/global.css', '/css/feed.css', '/js/api.js', '/js/layout.js', '/manifest.json'];
 
 self.addEventListener('install', e => {
